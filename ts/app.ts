@@ -100,9 +100,6 @@ async function loadWasm(): Promise<void> {
         window.plot_step = expo.plot_step;
         window.plot_multiple_functions = expo.plot_multiple_functions;
         window.draw_random_pattern = expo.draw_random_pattern;
-        window.say_hi = expo.say_hi;
-        window.foo = expo.foo;
-
 
         console.log("WebAssembly loaded successfully!");
 
