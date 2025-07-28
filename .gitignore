@@ -3,3 +3,4 @@ project.tsbuildinfo
 main.log
 main.out
 main.toc
+Cargo.lock

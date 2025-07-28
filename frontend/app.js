@@ -28,14 +28,34 @@ function createCanvasImports() {
         stroke: () => { ctx.stroke(); },
         stroke_rect: (x, y, width, height) => { ctx.strokeRect(x, y, width, height); },
         width: () => { return canvas.width; },
+        fill_text: (textPtr, textLen, x, y) => {
+            const bytes = new Uint8Array(wasmMemory.buffer, textPtr, textLen);
+            const text = new TextDecoder("utf-8").decode(bytes);
+            ctx.fillText(text, x, y);
+        },
+        set_font: (fontPtr, fontLen) => {
+            const bytes = new Uint8Array(wasmMemory.buffer, fontPtr, fontLen);
+            const font = new TextDecoder("utf-8").decode(bytes);
+            ctx.font = font;
+        },
+        set_text_align: (alignPtr, alignLen) => {
+            const bytes = new Uint8Array(wasmMemory.buffer, alignPtr, alignLen);
+            const align = new TextDecoder("utf-8").decode(bytes);
+            ctx.textAlign = align;
+        },
     };
 }
-function createconsoleImports() {
+function createConsoleImports() {
     return {
         log: (ptr, len) => {
             const bytes = new Uint8Array(wasmMemory.buffer, ptr, len);
             const msg = new TextDecoder("utf-8").decode(bytes);
             console.log("[WASM]", msg);
+        },
+        error: (ptr, len) => {
+            const bytes = new Uint8Array(wasmMemory.buffer, ptr, len);
+            const msg = new TextDecoder("utf-8").decode(bytes);
+            console.error("[WASM]", msg);
         }
     };
 }
@@ -44,16 +64,28 @@ function createMathImports() {
         random: Math.random,
     };
 }
+function createBrowserImports() {
+    return {
+        alert: (ptr, len) => {
+            const bytes = new Uint8Array(wasmMemory.buffer, ptr, len);
+            const msg = new TextDecoder("utf-8").decode(bytes);
+            window.alert(msg);
+        }
+    };
+}
 async function loadWasm() {
     try {
         setupCanvas();
         const wasmModule = await WebAssembly.instantiateStreaming(fetch('./web_fourier.wasm'), {
             Math: createMathImports(),
-            Console: createconsoleImports(),
+            Console: createConsoleImports(),
             Canvas: createCanvasImports(),
+            Browser: createBrowserImports(),
         });
         const expo = wasmModule.instance.exports;
         wasmMemory = expo.memory;
+        window.plot_step = expo.plot_step;
+        window.plot_multiple_functions = expo.plot_multiple_functions;
         window.draw_random_pattern = expo.draw_random_pattern;
         window.say_hi = expo.say_hi;
         window.foo = expo.foo;
@@ -66,5 +98,16 @@ async function loadWasm() {
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', async () => {
     await loadWasm();
+    // Add event listeners for buttons
+    document.getElementById('random-pattern')?.addEventListener('click', () => { window.draw_random_pattern(); });
+    document.getElementById('plot-multiple')?.addEventListener('click', () => { window.plot_multiple_functions(); });
+    document.getElementById('plot-step')?.addEventListener('click', () => {
+        const cutoffInput = document.getElementById('cutoff');
+        const cutoff = parseInt(cutoffInput.value, 10);
+        window.plot_step(cutoff);
+    });
+    document.getElementById('cutoff')?.addEventListener('change', () => {
+        document.getElementById('plot-step')?.click();
+    });
     window.draw_random_pattern();
 });

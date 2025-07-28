@@ -7,3 +7,4 @@ edition = "2021"
 crate-type = ["cdylib"]  # Compile this crate as a dynamic system library (C-compatible).
 
 [dependencies]
+num-complex = "0.4"

@@ -9,6 +9,12 @@
     <div class="container">
         <h1>Rust WebAssembly Canvas</h1>
         <canvas id="canvas" width="800" height="600"></canvas>
+        <div class="controls">
+            <button id="random-pattern">Plot Random Pattern</button>
+            <button id="plot-multiple">Plot Multiple Functions</button>
+            <button id="plot-step">Plot Step Function</button>
+            <input type="number" id="cutoff" placeholder="Cutoff Frequency" value="5" min="1" max="100">
+        </div>
     </div>
 
     <script type="module" src="./app.js"></script>
