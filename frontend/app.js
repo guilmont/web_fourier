@@ -2,6 +2,15 @@
 let canvas;
 let ctx;
 let wasmMemory;
+function animate(cutoff, i = 0) {
+    if (i >= 400) {
+        return;
+    }
+    window.animate_fourier(cutoff, i);
+    setTimeout(() => {
+        animate(cutoff, i + 1);
+    }, 16);
+}
 function setupCanvas() {
     canvas = document.getElementById('canvas');
     if (!canvas) {
@@ -87,6 +96,7 @@ async function loadWasm() {
         window.plot_step = expo.plot_step;
         window.plot_multiple_functions = expo.plot_multiple_functions;
         window.draw_random_pattern = expo.draw_random_pattern;
+        window.animate_fourier = expo.animate_fourier;
         console.log("WebAssembly loaded successfully!");
     }
     catch (error) {
@@ -103,6 +113,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const cutoffInput = document.getElementById('cutoff');
         const cutoff = parseInt(cutoffInput.value, 10);
         window.plot_step(cutoff);
+    });
+    document.getElementById('animate')?.addEventListener('click', () => {
+        const cutoffInput = document.getElementById('cutoff');
+        const cutoff = parseInt(cutoffInput.value, 10);
+        animate(cutoff);
     });
     document.getElementById('cutoff')?.addEventListener('change', () => {
         document.getElementById('plot-step')?.click();

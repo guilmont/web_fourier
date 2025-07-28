@@ -12,6 +12,8 @@ pub struct Plotter {
     y_ticks: u32,
     font_size: f32,
 
+    hide_axes: bool,
+
     // Additional fields can be added for more features like grid lines, axes, etc.
     data: Vec<FunctionData>,
 }
@@ -26,6 +28,7 @@ impl Plotter {
             x_ticks: 10,
             y_ticks: 10,
             font_size: 12.0,
+            hide_axes: false,
             data: Vec::new(),
         }
     }
@@ -50,6 +53,8 @@ impl Plotter {
     pub fn set_y_ticks(&mut self, ticks: u32) { self.y_ticks = ticks; }
     /// Set the font size for text rendering
     pub fn set_font_size(&mut self, size: f32) { self.font_size = size; }
+    /// Hide the axes
+    pub fn hide_axes(&mut self) { self.hide_axes = true; }
 
     /// Plot a single function as a line
     pub fn plot_line(&mut self, x_data: &[f32], y_data: &[f32], color: (u8, u8, u8), line_width: f32) -> Result<(), String> {
@@ -59,8 +64,17 @@ impl Plotter {
         if x_data.len() < 2 {
             return Err("At least two data points are required to plot a line".to_string());
         }
-        self.data.push(FunctionData { x_data: x_data.to_vec(), y_data: y_data.to_vec(), color, line_width });
+        self.data.push(FunctionData { style: FunctionType::LINE, x_data: x_data.to_vec(), y_data: y_data.to_vec(), color, line_width });
         Ok(())
+    }
+
+    pub fn plot_arrow(&mut self, x_data: &[f32], y_data: &[f32], color: (u8, u8, u8), line_width: f32) -> Result<(), String> {
+        if x_data.len() == 2 && y_data.len() == 2 {
+            self.data.push(FunctionData { style: FunctionType::ARROW, x_data: x_data.to_vec(), y_data: y_data.to_vec(), color, line_width });
+            Ok(())
+        } else {
+            Err("x_data and y_data must have exactly two points for arrows".to_string())
+        }
     }
 
     /// Plot multiple functions on the same canvas with different colors
@@ -89,25 +103,33 @@ impl Plotter {
         }
 
         canvas::clear();
-        self.draw_grid();
-        self.draw_axes();
+        if !self.hide_axes {
+            self.draw_grid();
+            self.draw_axes();
+        }
 
         for func in &self.data {
-            canvas::begin_path();
-            canvas::set_stroke_color(func.color.0, func.color.1, func.color.2, 1.0);
-            canvas::set_line_width(func.line_width);
-
-            // Move to first point
-            let (x_pixel, y_pixel) = self.transform_point(func.x_data[0], func.y_data[0]);
-            canvas::move_to(x_pixel, y_pixel);
-
-            // Draw lines to subsequent points
-            for i in 1..func.x_data.len() {
-                let (x_pixel, y_pixel) = self.transform_point(func.x_data[i], func.y_data[i]);
-                canvas::line_to(x_pixel, y_pixel);
+            match func.style {
+                FunctionType::LINE => {
+                    canvas::begin_path();
+                    canvas::set_stroke_color(func.color.0, func.color.1, func.color.2, 1.0);
+                    canvas::set_line_width(func.line_width);
+                    // Move to first point
+                    let (x_pixel, y_pixel) = self.transform_point(func.x_data[0], func.y_data[0]);
+                    canvas::move_to(x_pixel, y_pixel);
+                    // Draw lines to subsequent points
+                    for i in 1..func.x_data.len() {
+                        let (x_pixel, y_pixel) = self.transform_point(func.x_data[i], func.y_data[i]);
+                        canvas::line_to(x_pixel, y_pixel);
+                    }
+                    canvas::stroke();
+                },
+                FunctionType::ARROW => {
+                    let start_x = self.transform_point(func.x_data[0], func.y_data[0]);
+                    let end_x = self.transform_point(func.x_data[1], func.y_data[1]);
+                    canvas::draw_arrow(start_x.0, start_x.1, end_x.0, end_x.1, func.color, func.line_width);
+                }
             }
-
-            canvas::stroke();
         }
     }
 
@@ -232,11 +254,21 @@ impl Plotter {
     }
 }
 
+/// Private helper functions /////////////////////////////////////////////////////////////////
+enum FunctionType {
+    LINE,
+    ARROW,
+}
+
 /// Data structure for a single function to plot
 struct FunctionData {
+    style: FunctionType,
+    /// X and Y data points for the function
     x_data: Vec<f32>,
     y_data: Vec<f32>,
-    color: (u8, u8, u8), // RGB color
+    // RGB color
+    color: (u8, u8, u8),
+    /// Line width for the function
     line_width: f32,
 }
 

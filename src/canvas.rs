@@ -73,15 +73,18 @@ pub fn set_text_align(align: &str)                                        { unsa
 
 /// More elaborated utility functions ////////////////////////////////////////////////////
 
+/// Clears the entire canvas
 pub fn clear() {
     clear_rect(0.0, 0.0, width(), height());
 }
 
+/// Draws a rectangle at (x, y) with a given width, height and color.
 pub fn draw_rect(x: f32, y: f32, width: f32, height: f32, color: (u8, u8, u8)) {
     set_fill_color(color.0, color.1, color.2, 1.0);
     fill_rect(x, y, width, height);
 }
 
+/// Draws a circle at (x, y) with a given radius and color.
 pub fn draw_circle(x: f32, y: f32, radius: f32, color: (u8, u8, u8)) {
     set_fill_color(color.0, color.1, color.2, 1.0);
     begin_path();
@@ -89,6 +92,7 @@ pub fn draw_circle(x: f32, y: f32, radius: f32, color: (u8, u8, u8)) {
     fill();
 }
 
+/// Draws a line from (x1, y1) to (x2, y2) with a given color and width.
 pub fn draw_line(x1: f32, y1: f32, x2: f32, y2: f32, color: (u8, u8, u8), width: f32) {
     set_stroke_color(color.0, color.1, color.2, 1.0);
     set_line_width(width);
@@ -96,4 +100,42 @@ pub fn draw_line(x1: f32, y1: f32, x2: f32, y2: f32, color: (u8, u8, u8), width:
     move_to(x1, y1);
     line_to(x2, y2);
     stroke();
+}
+
+/// Draws a triangle centered at (x, y) with a given size and orientation angle (in radians).
+pub fn draw_triangle(x: f32, y: f32, size: f32, angle: f32, color: (u8, u8, u8)) {
+    let h = size; // height from center to tip
+    let w = size * 0.6; // width of the base
+    // Calculate the three vertices
+    let tip_x = x + h * angle.cos();
+    let tip_y = y + h * angle.sin();
+    let base_angle1 = angle + std::f32::consts::PI * 2.0 / 3.0;
+    let base_angle2 = angle - std::f32::consts::PI * 2.0 / 3.0;
+    let base1_x = x + w * base_angle1.cos();
+    let base1_y = y + w * base_angle1.sin();
+    let base2_x = x + w * base_angle2.cos();
+    let base2_y = y + w * base_angle2.sin();
+    set_fill_color(color.0, color.1, color.2, 1.0);
+    begin_path();
+    move_to(tip_x, tip_y);
+    line_to(base1_x, base1_y);
+    line_to(base2_x, base2_y);
+    line_to(tip_x, tip_y);
+    fill();
+}
+
+/// Draws an arrow from (x1, y1) to (x2, y2) with a given color and width.
+pub fn draw_arrow(x1: f32, y1: f32, x2: f32, y2: f32, color: (u8, u8, u8), width: f32) {
+    // Skip drawing if the length is too small to be visible
+    let length = ((x2 - x1).powi(2) + (y2 - y1).powi(2)).sqrt();
+    if length < width { return; }
+
+    // Draw the main line
+    draw_line(x1, y1, x2, y2, color, width);
+
+    let height = 6.0 * width;
+    let angle = (y2 - y1).atan2(x2 - x1);
+
+    // Draw arrowhead
+    draw_triangle(x2 - height * angle.cos(), y2 - height * angle.sin(), height, angle, color);
 }

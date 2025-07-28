@@ -86,3 +86,66 @@ pub fn plot_multiple_functions() {
 
     plt.show();
 }
+
+fn gen_cyclic_function() -> (Vec<f32>, Vec<f32>) {
+    const BIG_R: f32 = 5.0;
+    const SMALL_R: f32 = 3.0;
+    const D: f32 = 2.0;
+
+    let mut x = vec![0.0; 400];
+    let mut y = vec![0.0; 400];
+    for i in 0..400 {
+        let angle =  (i as f32) * 6.0 * std::f32::consts::PI / 399.0; // Full cycle
+        x[i] = (BIG_R + SMALL_R) * angle.cos() + D * ((BIG_R + SMALL_R) / SMALL_R * angle).cos();
+        y[i] = (BIG_R + SMALL_R) * angle.sin() + D * ((BIG_R + SMALL_R) / SMALL_R * angle).sin();
+    }
+    (x, y)
+}
+
+#[no_mangle]
+pub fn animate_fourier(cutoff: usize, step: usize) {
+    // Create step function data
+    let (x, y) = gen_cyclic_function();
+
+    let mx = match math::low_pass_matrix(x.as_slice(), cutoff) {
+        Ok(val) => val,
+        Err(msg) => { browser::alert(&format!("Error in low-pass matrix: {}", msg)); return; }
+    };
+    let my = match math::low_pass_matrix(y.as_slice(), cutoff) {
+        Ok(val) => val,
+        Err(msg) => { browser::alert(&format!("Error in low-pass matrix: {}", msg)); return; }
+    };
+
+    let rows = mx.len();
+    let cols = mx[0].len();
+
+    let mut arx = vec![0.0; rows];
+    let mut ary = vec![0.0; rows];
+    for i in 0..rows {
+        for j in 0..cols {
+            arx[i] += mx[i][j];
+            ary[i] += my[i][j];
+        }
+    }
+
+    let mut plt = plotter::Plotter::new();
+    plt.set_x_range(-12.0, 12.0);
+    plt.set_y_range(-12.0, 12.0);
+    let _ = plt.plot_line(x.as_slice(), y.as_slice(), canvas::TAB_BLUE, 2.0);
+
+    let mut start_x = 0.0;
+    let mut start_y = 0.0;
+    let mut end_x = 0.0;
+    let mut end_y = 0.0;
+    for j in 0..cols {
+        end_x += mx[step][j];
+        end_y += my[step][j];
+        let _ = plt.plot_arrow(&[start_x, end_x], &[start_y, end_y], canvas::TAB_GREEN, 2.0);
+        start_x = end_x;
+        start_y = end_y;
+
+    }
+    let _ = plt.plot_line(arx.as_slice(), ary.as_slice(), canvas::TAB_ORANGE, 2.0);
+
+    plt.show();
+}

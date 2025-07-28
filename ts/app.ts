@@ -2,6 +2,16 @@ let canvas: HTMLCanvasElement;
 let ctx: CanvasRenderingContext2D;
 let wasmMemory: WebAssembly.Memory;
 
+
+function animate(cutoff: number, i = 0): void {
+    if (i >= 400) { return; }
+    window.animate_fourier(cutoff, i);
+
+    setTimeout(() => {
+        animate(cutoff, i + 1);
+    },16);
+}
+
 function setupCanvas(): void {
     canvas = document.getElementById('canvas') as HTMLCanvasElement;
     if (!canvas) {
@@ -100,6 +110,7 @@ async function loadWasm(): Promise<void> {
         window.plot_step = expo.plot_step;
         window.plot_multiple_functions = expo.plot_multiple_functions;
         window.draw_random_pattern = expo.draw_random_pattern;
+        window.animate_fourier = expo.animate_fourier;
 
         console.log("WebAssembly loaded successfully!");
 
@@ -119,6 +130,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const cutoffInput = document.getElementById('cutoff') as HTMLInputElement;
         const cutoff = parseInt(cutoffInput.value, 10);
         window.plot_step(cutoff);
+    });
+    document.getElementById('animate')?.addEventListener('click', () => {
+        const cutoffInput = document.getElementById('cutoff') as HTMLInputElement;
+        const cutoff = parseInt(cutoffInput.value, 10);
+        animate(cutoff);
     });
 
     document.getElementById('cutoff')?.addEventListener('change', () => {

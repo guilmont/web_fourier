@@ -5,6 +5,4 @@ mod js {
     }
 }
 
-pub fn alert(msg: &str) {
-    unsafe { js::alert(msg.as_ptr(), msg.len()); }
-}
+pub fn alert(msg: &str) { unsafe { js::alert(msg.as_ptr(), msg.len()); } }
