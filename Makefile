@@ -1,6 +1,6 @@
 # Directories and files
-WASM_SRC = target/wasm32-unknown-unknown/release/wasm_rust.wasm
-WASM_DEST = frontend/wasm_rust.wasm
+WASM_SRC = target/wasm32-unknown-unknown/release/web_fourier.wasm
+WASM_DEST = frontend/web_fourier.wasm
 TS_DIR = ts
 TS_CONFIG = $(TS_DIR)/tsconfig.json
 

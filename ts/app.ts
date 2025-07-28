@@ -54,7 +54,7 @@ async function loadWasm(): Promise<void> {
         setupCanvas();
 
         const wasmModule = await WebAssembly.instantiateStreaming(
-            fetch('./wasm_rust.wasm'),
+            fetch('./web_fourier.wasm'),
             {
                 Math: createMathImports(),
                 Console: createconsoleImports(),

@@ -1,0 +1,306 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+
+\title{The Fourier Transform: From Continuous to Discrete and the FFT Algorithm}
+\author{Your Name}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+\newpage
+
+\section{Introduction}
+
+The Fourier Transform is one of the most powerful mathematical tools in signal processing, physics, and engineering. It allows us to decompose any signal into its constituent frequency components, revealing the "hidden" periodicities within seemingly complex waveforms. This document provides a comprehensive overview of the Fourier Transform, starting from the continuous case, moving to the discrete version, and finally exploring the Fast Fourier Transform (FFT) algorithm.
+
+\section{The Continuous Fourier Transform}
+
+\subsection{Definition and Intuition}
+
+The Continuous Fourier Transform (CFT) of a function $f(t)$ is defined as:
+
+\begin{equation}
+F(\omega) = \int_{-\infty}^{\infty} f(t) e^{-i\omega t} dt
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $F(\omega)$ is the frequency domain representation
+    \item $f(t)$ is the time domain signal
+    \item $\omega$ is the angular frequency (radians per second)
+    \item $i$ is the imaginary unit
+\end{itemize}
+
+The inverse Fourier Transform recovers the original signal:
+
+\begin{equation}
+f(t) = \frac{1}{2\pi} \int_{-\infty}^{\infty} F(\omega) e^{i\omega t} d\omega
+\end{equation}
+
+\subsection{Physical Interpretation}
+
+The Fourier Transform essentially asks: "How much of each frequency $\omega$ is present in the signal $f(t)$?" The complex exponential $e^{-i\omega t} = \cos(\omega t) - i\sin(\omega t)$ acts as a "probe" that correlates the signal with sinusoidal components at frequency $\omega$.
+
+When we compute $F(\omega)$, we obtain:
+\begin{itemize}
+    \item \textbf{Magnitude} $|F(\omega)|$: represents the amplitude of frequency component $\omega$
+    \item \textbf{Phase} $\arg(F(\omega))$: represents the phase shift of that frequency component
+\end{itemize}
+
+\subsection{Key Properties}
+
+\subsubsection{Linearity}
+If $\mathcal{F}\{f(t)\} = F(\omega)$ and $\mathcal{F}\{g(t)\} = G(\omega)$, then:
+\begin{equation}
+\mathcal{F}\{af(t) + bg(t)\} = aF(\omega) + bG(\omega)
+\end{equation}
+
+\subsubsection{Time Shifting}
+\begin{equation}
+\mathcal{F}\{f(t-t_0)\} = F(\omega)e^{-i\omega t_0}
+\end{equation}
+
+\subsubsection{Frequency Shifting}
+\begin{equation}
+\mathcal{F}\{f(t)e^{i\omega_0 t}\} = F(\omega - \omega_0)
+\end{equation}
+
+\subsubsection{Convolution Theorem}
+\begin{equation}
+\mathcal{F}\{f(t) * g(t)\} = F(\omega) \cdot G(\omega)
+\end{equation}
+
+where $*$ denotes convolution.
+
+\section{The Discrete Fourier Transform (DFT)}
+
+\subsection{Motivation and Definition}
+
+In practice, we work with discrete, finite-length signals. The Discrete Fourier Transform (DFT) is the discrete analog of the continuous Fourier Transform, designed for sequences of $N$ samples.
+
+For a discrete signal $x[n]$ where $n = 0, 1, 2, \ldots, N-1$, the DFT is defined as:
+
+\begin{equation}
+X[k] = \sum_{n=0}^{N-1} x[n] e^{-i 2\pi k n / N}
+\end{equation}
+
+where $k = 0, 1, 2, \ldots, N-1$ are the frequency bin indices.
+
+The inverse DFT (IDFT) is:
+
+\begin{equation}
+x[n] = \frac{1}{N} \sum_{k=0}^{N-1} X[k] e^{i 2\pi k n / N}
+\end{equation}
+
+\subsection{Frequency Interpretation}
+
+The DFT computes the spectrum at $N$ equally spaced frequency points:
+\begin{equation}
+\omega_k = \frac{2\pi k}{N}, \quad k = 0, 1, \ldots, N-1
+\end{equation}
+
+If the sampling rate is $f_s$, then the actual frequencies are:
+\begin{equation}
+f_k = \frac{k f_s}{N}, \quad k = 0, 1, \ldots, N-1
+\end{equation}
+
+\subsection{Key Differences from CFT}
+
+\begin{itemize}
+    \item \textbf{Periodicity}: Both $x[n]$ and $X[k]$ are periodic with period $N$
+    \item \textbf{Finite}: We only consider $N$ samples in both domains
+    \item \textbf{Sampling}: The frequency domain is also sampled (quantized)
+\end{itemize}
+
+\subsection{Matrix Representation}
+
+The DFT can be written as a matrix multiplication:
+\begin{equation}
+\mathbf{X} = \mathbf{W}_N \mathbf{x}
+\end{equation}
+
+where $\mathbf{W}_N$ is the $N \times N$ DFT matrix with elements:
+\begin{equation}
+[\mathbf{W}_N]_{k,n} = e^{-i 2\pi k n / N}
+\end{equation}
+
+Direct computation requires $O(N^2)$ complex multiplications.
+
+\section{The Fast Fourier Transform (FFT)}
+
+\subsection{The Computational Challenge}
+
+Computing the DFT directly requires $N^2$ complex multiplications and additions. For large $N$ (e.g., $N = 1024$ or $N = 4096$), this becomes computationally expensive. The FFT algorithm reduces this complexity from $O(N^2)$ to $O(N \log N)$.
+
+\subsection{The Cooley-Tukey Algorithm}
+
+The most common FFT algorithm is the Cooley-Tukey algorithm, which uses a divide-and-conquer approach. We'll focus on the radix-2 decimation-in-time version, which requires $N$ to be a power of 2.
+
+\subsubsection{Key Insight: Divide and Conquer}
+
+The main idea is to recursively break down the DFT of length $N$ into two DFTs of length $N/2$:
+
+\begin{align}
+X[k] &= \sum_{n=0}^{N-1} x[n] W_N^{kn} \\
+&= \sum_{n \text{ even}} x[n] W_N^{kn} + \sum_{n \text{ odd}} x[n] W_N^{kn}
+\end{align}
+
+Let $n = 2m$ for even indices and $n = 2m+1$ for odd indices:
+
+\begin{align}
+X[k] &= \sum_{m=0}^{N/2-1} x[2m] W_N^{2km} + \sum_{m=0}^{N/2-1} x[2m+1] W_N^{k(2m+1)} \\
+&= \sum_{m=0}^{N/2-1} x[2m] W_{N/2}^{km} + W_N^k \sum_{m=0}^{N/2-1} x[2m+1] W_{N/2}^{km}
+\end{align}
+
+where we used the identity $W_N^{2km} = W_{N/2}^{km}$.
+
+This gives us:
+\begin{equation}
+X[k] = E[k] + W_N^k \cdot O[k]
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $E[k]$ is the DFT of the even-indexed samples
+    \item $O[k]$ is the DFT of the odd-indexed samples
+    \item $W_N^k = e^{-i2\pi k/N}$ is the "twiddle factor"
+\end{itemize}
+
+\subsubsection{Periodicity and Symmetry}
+
+Since $E[k]$ and $O[k]$ are periodic with period $N/2$, we have:
+\begin{align}
+X[k] &= E[k] + W_N^k \cdot O[k], \quad k = 0, 1, \ldots, N/2-1 \\
+X[k + N/2] &= E[k] - W_N^k \cdot O[k], \quad k = 0, 1, \ldots, N/2-1
+\end{align}
+
+This symmetry allows us to compute all $N$ output points using only $N/2$ evaluations of each sub-DFT.
+
+\subsection{FFT Algorithm Pseudocode}
+
+\begin{algorithm}
+\caption{Cooley-Tukey FFT (Radix-2, Decimation-in-Time)}
+\begin{algorithmic}[1]
+\REQUIRE $x[0..N-1]$ where $N = 2^m$
+\ENSURE $X[0..N-1]$ (DFT of $x$)
+
+\IF{$N = 1$}
+    \RETURN $x[0]$
+\ENDIF
+
+\STATE $x_{even} \leftarrow [x[0], x[2], x[4], \ldots, x[N-2]]$
+\STATE $x_{odd} \leftarrow [x[1], x[3], x[5], \ldots, x[N-1]]$
+
+\STATE $E \leftarrow \text{FFT}(x_{even})$ \COMMENT{Recursive call}
+\STATE $O \leftarrow \text{FFT}(x_{odd})$ \COMMENT{Recursive call}
+
+\FOR{$k = 0$ to $N/2 - 1$}
+    \STATE $t \leftarrow e^{-i2\pi k/N} \cdot O[k]$ \COMMENT{Twiddle factor multiplication}
+    \STATE $X[k] \leftarrow E[k] + t$
+    \STATE $X[k + N/2] \leftarrow E[k] - t$
+\ENDFOR
+
+\RETURN $X$
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Computational Complexity}
+
+The FFT reduces the computational complexity from $O(N^2)$ to $O(N \log N)$:
+
+\begin{itemize}
+    \item \textbf{Levels}: $\log_2 N$ levels of recursion
+    \item \textbf{Operations per level}: $N$ complex multiplications and additions
+    \item \textbf{Total}: $N \log_2 N$ operations
+\end{itemize}
+
+For $N = 1024$:
+\begin{itemize}
+    \item Direct DFT: $1024^2 = 1,048,576$ operations
+    \item FFT: $1024 \times 10 = 10,240$ operations
+    \item Speedup: $\sim 100\times$
+\end{itemize}
+
+\subsection{Bit-Reversal and In-Place Implementation}
+
+The recursive formulation can be converted to an iterative, in-place algorithm using bit-reversal ordering. The input array is first rearranged so that element at position $n$ is moved to position obtained by reversing the binary representation of $n$.
+
+For example, with $N = 8$:
+\begin{center}
+\begin{tabular}{|c|c|c|c|}
+\hline
+Decimal & Binary & Bit-Reversed & New Position \\
+\hline
+0 & 000 & 000 & 0 \\
+1 & 001 & 100 & 4 \\
+2 & 010 & 010 & 2 \\
+3 & 011 & 110 & 6 \\
+4 & 100 & 001 & 1 \\
+5 & 101 & 101 & 5 \\
+6 & 110 & 011 & 3 \\
+7 & 111 & 111 & 7 \\
+\hline
+\end{tabular}
+\end{center}
+
+\section{Applications and Practical Considerations}
+
+\subsection{Common Applications}
+
+\begin{itemize}
+    \item \textbf{Digital Signal Processing}: Filtering, spectral analysis
+    \item \textbf{Image Processing}: Compression (JPEG), enhancement
+    \item \textbf{Audio Processing}: Music analysis, noise reduction
+    \item \textbf{Communications}: Modulation schemes (OFDM)
+    \item \textbf{Scientific Computing}: Solving PDEs, convolution
+\end{itemize}
+
+\subsection{Windowing}
+
+When applying the DFT to finite-length signals, edge effects can cause spectral leakage. Windowing functions (Hamming, Hanning, Blackman) are applied to mitigate these effects:
+
+\begin{equation}
+x_w[n] = x[n] \cdot w[n]
+\end{equation}
+
+where $w[n]$ is the window function.
+
+\subsection{Zero-Padding}
+
+Zero-padding increases frequency resolution and can improve the appearance of the spectrum:
+
+\begin{equation}
+x_{padded}[n] = \begin{cases}
+x[n] & \text{if } 0 \leq n < N \\
+0 & \text{if } N \leq n < M
+\end{cases}
+\end{equation}
+
+where $M > N$ is the new length.
+
+\section{Conclusion}
+
+The Fourier Transform provides a fundamental bridge between time and frequency domains, enabling us to analyze and manipulate signals in ways that would be impossible in a single domain. The progression from the continuous Fourier Transform to the discrete version, and finally to the computationally efficient FFT algorithm, demonstrates how mathematical theory translates into practical computational tools.
+
+The FFT's $O(N \log N)$ complexity has made real-time spectral analysis possible in countless applications, from digital audio processing to medical imaging. Understanding these concepts provides the foundation for advanced signal processing techniques and helps in choosing appropriate tools for specific applications.
+
+\section{References}
+
+\begin{itemize}
+    \item Cooley, J. W., \& Tukey, J. W. (1965). An algorithm for the machine calculation of complex Fourier series. Mathematics of Computation, 19(90), 297-301.
+    \item Oppenheim, A. V., \& Schafer, R. W. (2009). Discrete-time signal processing. Pearson.
+    \item Brigham, E. O. (1988). The fast Fourier transform and its applications. Prentice Hall.
+\end{itemize}
+
+\end{document}
