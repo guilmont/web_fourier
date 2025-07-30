@@ -5,8 +5,7 @@ mod plotter;
 mod browser;
 mod animation;
 
-#[no_mangle]
-pub fn plot_step(cutoff: usize) {
+fn plot_step_internal(canvas_id: u32, cutoff: usize) {
     const STEP_START: usize = 150;
     const STEP_END: usize = 350;
 
@@ -21,7 +20,7 @@ pub fn plot_step(cutoff: usize) {
         Ok(val) => val,
         Err(msg) => { browser::alert(&format!("Error in low-pass filter: {}", msg)); return; }
     };
-    let mut plt = plotter::Plotter::new();
+    let mut plt = plotter::Plotter::new(canvas_id);
 
     if let Err(msg) = plt.plot_line(&t, fourier.original(), canvas::TAB_BLUE, 2.0) {
         console::error(&format!("Error plotting step function: {}", msg));
@@ -32,6 +31,11 @@ pub fn plot_step(cutoff: usize) {
         return;
     }
     plt.show();
+}
+
+#[no_mangle]
+pub fn plot_step(canvas_id: u32, cutoff: usize) {
+    plot_step_internal(canvas_id, cutoff);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -57,9 +61,9 @@ fn gen_cyclic_function() -> (Vec<f32>, Vec<f32>) {
 }
 
 
-fn init_animation(cutoff: usize) {
+fn init_animation_on_canvas(cutoff: usize, canvas_id: u32) {
     let (x, y) = crate::gen_cyclic_function();
-    match animation::Fourier::new(x, y, cutoff) {
+    match animation::Fourier::new(x, y, cutoff, canvas_id) {
         Ok(mut var) => {
             var.start();
             unsafe { ANIMATION = Some(var); }
@@ -78,11 +82,11 @@ pub fn step_animation() {
 }
 
 #[no_mangle]
-pub fn play_pause_animation(cutoff: usize) {
+pub fn play_pause_animation(canvas_id: u32, cutoff: usize) {
     unsafe {
         if let Some(ref mut var) = ANIMATION {
             if var.is_stopped() {
-                init_animation(cutoff);
+                init_animation_on_canvas(cutoff, canvas_id);
             } else if var.is_paused() {
                 var.play();
             } else if var.speed() > 1.0 || var.speed() < 1.0 {
@@ -91,7 +95,7 @@ pub fn play_pause_animation(cutoff: usize) {
                 var.pause();
             }
         } else {
-            init_animation(cutoff);
+            init_animation_on_canvas(cutoff, canvas_id);
         }
     }
 }

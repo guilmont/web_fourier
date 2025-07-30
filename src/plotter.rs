@@ -4,6 +4,7 @@ use crate::canvas;
 
 /// Mathematical canvas plotting engine with customizable viewport
 pub struct Plotter {
+    canvas: canvas::Canvas,
     canvas_width: f32,
     canvas_height: f32,
 
@@ -20,10 +21,15 @@ pub struct Plotter {
 
 impl Plotter {
     /// Create a new plotting canvas with auto-detected dimensions
-    pub fn new() -> Self {
+    pub fn new(canvas_id: u32) -> Self {
+        let canvas = canvas::Canvas::new(canvas_id);
+        let canvas_width = canvas.width();
+        let canvas_height = canvas.height();
+        
         Self {
-            canvas_width: canvas::width(),
-            canvas_height: canvas::height(),
+            canvas,
+            canvas_width,
+            canvas_height,
             viewport: Viewport { x_min: 0.0, x_max: 1.0, y_min: 0.0, y_max: 1.0, x_auto: true, y_auto: true },
             x_ticks: 10,
             y_ticks: 10,
@@ -102,7 +108,7 @@ impl Plotter {
             self.set_y_range(y_min - 0.1 * range, y_max + 0.1 * range);
         }
 
-        canvas::clear();
+        self.canvas.clear();
         if !self.hide_axes {
             self.draw_grid();
             self.draw_axes();
@@ -111,23 +117,23 @@ impl Plotter {
         for func in &self.data {
             match func.style {
                 FunctionType::LINE => {
-                    canvas::begin_path();
-                    canvas::set_stroke_color(func.color.0, func.color.1, func.color.2, 1.0);
-                    canvas::set_line_width(func.line_width);
+                    self.canvas.begin_path();
+                    self.canvas.set_stroke_color(func.color.0, func.color.1, func.color.2, 1.0);
+                    self.canvas.set_line_width(func.line_width);
                     // Move to first point
                     let (x_pixel, y_pixel) = self.transform_point(func.x_data[0], func.y_data[0]);
-                    canvas::move_to(x_pixel, y_pixel);
+                    self.canvas.move_to(x_pixel, y_pixel);
                     // Draw lines to subsequent points
                     for i in 1..func.x_data.len() {
                         let (x_pixel, y_pixel) = self.transform_point(func.x_data[i], func.y_data[i]);
-                        canvas::line_to(x_pixel, y_pixel);
+                        self.canvas.line_to(x_pixel, y_pixel);
                     }
-                    canvas::stroke();
+                    self.canvas.stroke();
                 },
                 FunctionType::ARROW => {
                     let start_x = self.transform_point(func.x_data[0], func.y_data[0]);
                     let end_x = self.transform_point(func.x_data[1], func.y_data[1]);
-                    canvas::draw_arrow(start_x.0, start_x.1, end_x.0, end_x.1, func.color, func.line_width);
+                    self.canvas.draw_arrow(start_x.0, start_x.1, end_x.0, end_x.1, func.color, func.line_width);
                 }
             }
         }
@@ -145,18 +151,18 @@ impl Plotter {
 
     /// Draw grid lines for reference
     fn draw_grid(&self) {
-        canvas::set_stroke_color(canvas::LIGHT_GRAY.0, canvas::LIGHT_GRAY.1, canvas::LIGHT_GRAY.2, 0.3);
-        canvas::set_line_width(1.0);
+        self.canvas.set_stroke_color(canvas::LIGHT_GRAY.0, canvas::LIGHT_GRAY.1, canvas::LIGHT_GRAY.2, 0.3);
+        self.canvas.set_line_width(1.0);
 
         // Vertical grid lines
         for i in 0..=self.x_ticks {
             let x = self.viewport.x_min + (self.viewport.x_max - self.viewport.x_min) * i as f32 / self.x_ticks as f32;
             let (x_pixel, _) = self.transform_point(x, 0.0);
 
-            canvas::begin_path();
-            canvas::move_to(x_pixel, 0.0);
-            canvas::line_to(x_pixel, self.canvas_height);
-            canvas::stroke();
+            self.canvas.begin_path();
+            self.canvas.move_to(x_pixel, 0.0);
+            self.canvas.line_to(x_pixel, self.canvas_height);
+            self.canvas.stroke();
         }
 
         // Horizontal grid lines
@@ -164,22 +170,22 @@ impl Plotter {
             let y = self.viewport.y_min + (self.viewport.y_max - self.viewport.y_min) * i as f32 / self.y_ticks as f32;
             let (_, y_pixel) = self.transform_point(0.0, y);
 
-            canvas::begin_path();
-            canvas::move_to(0.0, y_pixel);
-            canvas::line_to(self.canvas_width, y_pixel);
-            canvas::stroke();
+            self.canvas.begin_path();
+            self.canvas.move_to(0.0, y_pixel);
+            self.canvas.line_to(self.canvas_width, y_pixel);
+            self.canvas.stroke();
         }
     }
 
     /// Draw axes (X and Y axis lines)
     pub fn draw_axes(&self) {
-        canvas::set_stroke_color(canvas::BLACK.0, canvas::BLACK.1, canvas::BLACK.2, 1.0);
-        canvas::set_line_width(2.0);
+        self.canvas.set_stroke_color(canvas::BLACK.0, canvas::BLACK.1, canvas::BLACK.2, 1.0);
+        self.canvas.set_line_width(2.0);
 
         // Set up text drawing
-        canvas::set_fill_color(canvas::BLACK.0, canvas::BLACK.1, canvas::BLACK.2, 1.0);
-        canvas::set_font(&format!("{}px monospace", self.font_size));
-        canvas::set_text_align("center");
+        self.canvas.set_fill_color(canvas::BLACK.0, canvas::BLACK.1, canvas::BLACK.2, 1.0);
+        self.canvas.set_font(&format!("{}px monospace", self.font_size));
+        self.canvas.set_text_align("center");
         let tick_length = self.font_size / 2.0;
 
         // X-axis /////////////////////////////////////////////////////////////
@@ -187,10 +193,10 @@ impl Plotter {
             let (x_start, y_axis) = self.transform_point(self.viewport.x_min, 0.0);
             let (x_end, _) = self.transform_point(self.viewport.x_max, 0.0);
 
-            canvas::begin_path();
-            canvas::move_to(x_start, y_axis);
-            canvas::line_to(x_end, y_axis);
-            canvas::stroke();
+            self.canvas.begin_path();
+            self.canvas.move_to(x_start, y_axis);
+            self.canvas.line_to(x_end, y_axis);
+            self.canvas.stroke();
         }
 
         // Ticks and labels
@@ -202,16 +208,16 @@ impl Plotter {
                 let (x_pixel, _) = self.transform_point(x_val, 0.0);
 
                 // Draw tick mark
-                canvas::begin_path();
-                canvas::move_to(x_pixel, y_axis - tick_length / 2.0);
-                canvas::line_to(x_pixel, y_axis + tick_length / 2.0);
-                canvas::stroke();
+                self.canvas.begin_path();
+                self.canvas.move_to(x_pixel, y_axis - tick_length / 2.0);
+                self.canvas.line_to(x_pixel, y_axis + tick_length / 2.0);
+                self.canvas.stroke();
 
                 // Draw label
                 if x_val.abs() < 0.001 {
-                    canvas::fill_text("0", x_pixel, y_axis + self.font_size + 5.0);
+                    self.canvas.fill_text("0", x_pixel, y_axis + self.font_size + 5.0);
                 } else {
-                    canvas::fill_text(&format!("{:.1}", x_val), x_pixel, y_axis + self.font_size + 5.0);
+                    self.canvas.fill_text(&format!("{:.1}", x_val), x_pixel, y_axis + self.font_size + 5.0);
                 }
             }
         }
@@ -221,16 +227,16 @@ impl Plotter {
             let (x_axis, y_start) = self.transform_point(0.0, self.viewport.y_min);
             let (_, y_end) = self.transform_point(0.0, self.viewport.y_max);
 
-            canvas::begin_path();
-            canvas::move_to(x_axis, y_start);
-            canvas::line_to(x_axis, y_end);
-            canvas::stroke();
+            self.canvas.begin_path();
+            self.canvas.move_to(x_axis, y_start);
+            self.canvas.line_to(x_axis, y_end);
+            self.canvas.stroke();
         }
 
         // Ticks and labels
         if self.viewport.x_min <= 0.0 && self.viewport.x_max >= 0.0 {
             let (x_axis, _) = self.transform_point(0.0, 0.0);
-            canvas::set_text_align("right");
+            self.canvas.set_text_align("right");
 
             for i in 0..=self.y_ticks {
                 let y_val = self.viewport.y_min + (self.viewport.y_max - self.viewport.y_min) * i as f32 / self.y_ticks as f32;
@@ -242,13 +248,13 @@ impl Plotter {
                 }
 
                 // Draw tick mark
-                canvas::begin_path();
-                canvas::move_to(x_axis - tick_length / 2.0, y_pixel);
-                canvas::line_to(x_axis + tick_length / 2.0, y_pixel);
-                canvas::stroke();
+                self.canvas.begin_path();
+                self.canvas.move_to(x_axis - tick_length / 2.0, y_pixel);
+                self.canvas.line_to(x_axis + tick_length / 2.0, y_pixel);
+                self.canvas.stroke();
 
                 // Draw label
-                canvas::fill_text(&format!("{:.1}", y_val), x_axis - 10.0, y_pixel + self.font_size / 3.0);
+                self.canvas.fill_text(&format!("{:.1}", y_val), x_axis - 10.0, y_pixel + self.font_size / 3.0);
             }
         }
     }

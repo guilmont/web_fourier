@@ -1,12 +1,17 @@
 // Define constants for canvas dimensions
 const CANVAS_WIDTH = 800;
-const CANVAS_HEIGHT = 600;
+const CANVAS_HEIGHT = 400;
 
-let canvas: HTMLCanvasElement;
-let ctx: CanvasRenderingContext2D;
+const STEP_CANVAS_ID = 1;
+const ANIMATION_CANVAS_ID = 2;
+
+interface CanvasInfo {
+    canvas: HTMLCanvasElement;
+    context: CanvasRenderingContext2D;
+}
+
+let canvasRegistry: Map<number, CanvasInfo> = new Map();
 let wasmMemory: WebAssembly.Memory;
-
-let cutoffControl = true; // Control to determine which display to attach events of cutoff input
 
 // Global animation loop control
 let animationId: number | null = null;
@@ -36,34 +41,71 @@ function decodeWasmString(ptr: number, len: number): string {
     return new TextDecoder("utf-8").decode(bytes);
 }
 
+// Helper function to get canvas and context by integer ID
+function getCanvasInfo(canvasId: number): CanvasInfo {
+    const canvasInfo = canvasRegistry.get(canvasId);
+    if (!canvasInfo) {
+        throw new Error(`Canvas with id ${canvasId} not found`);
+    }
+    return canvasInfo;
+}
+
 function createCanvasImports() {
     return {
-        arc:                    (x: number, y: number, radius: number, startAngle: number, endAngle: number) => { ctx.arc(x, y, radius, startAngle, endAngle); },
-        begin_path:             () => { ctx.beginPath(); },
-        clear_rect:             (x: number, y: number, width: number, height: number) => { ctx.clearRect(x, y, width, height); },
-        fill:                   () => { ctx.fill(); },
-        fill_rect:              (x: number, y: number, width: number, height: number) => { ctx.fillRect(x, y, width, height); },
-        height:                 (): number => { return canvas.height; },
-        line_to:                (x: number, y: number) => { ctx.lineTo(x, y); },
-        move_to:                (x: number, y: number) => { ctx.moveTo(x, y); },
-        set_fill_style_color:   (r: number, g: number, b: number, a: number) => { ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`; },
-        set_line_width:         (width: number) => { ctx.lineWidth = width; },
-        set_stroke_style_color: (r: number, g: number, b: number, a: number) => { ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${a})`; },
-        stroke:                 () => { ctx.stroke(); },
-        stroke_rect:            (x: number, y: number, width: number, height: number) => { ctx.strokeRect(x, y, width, height); },
-        width:                  (): number => { return canvas.width; },
+        arc: (canvasId: number, x: number, y: number, radius: number, startAngle: number, endAngle: number) => {
+            getCanvasInfo(canvasId).context.arc(x, y, radius, startAngle, endAngle);
+        },
+        begin_path: (canvasId: number) => {
+            getCanvasInfo(canvasId).context.beginPath();
+        },
+        clear_rect: (canvasId: number, x: number, y: number, width: number, height: number) => {
+            getCanvasInfo(canvasId).context.clearRect(x, y, width, height);
+        },
+        fill: (canvasId: number) => {
+            getCanvasInfo(canvasId).context.fill();
+        },
+        fill_rect: (canvasId: number, x: number, y: number, width: number, height: number) => {
+            getCanvasInfo(canvasId).context.fillRect(x, y, width, height);
+        },
+        height: (canvasId: number): number => {
+            return getCanvasInfo(canvasId).canvas.height;
+        },
+        line_to: (canvasId: number, x: number, y: number) => {
+            getCanvasInfo(canvasId).context.lineTo(x, y);
+        },
+        move_to: (canvasId: number, x: number, y: number) => {
+            getCanvasInfo(canvasId).context.moveTo(x, y);
+        },
+        set_fill_style_color: (canvasId: number, r: number, g: number, b: number, a: number) => {
+            getCanvasInfo(canvasId).context.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
+        },
+        set_line_width: (canvasId: number, width: number) => {
+            getCanvasInfo(canvasId).context.lineWidth = width;
+        },
+        set_stroke_style_color: (canvasId: number, r: number, g: number, b: number, a: number) => {
+            getCanvasInfo(canvasId).context.strokeStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
+        },
+        stroke: (canvasId: number) => {
+            getCanvasInfo(canvasId).context.stroke();
+        },
+        stroke_rect: (canvasId: number, x: number, y: number, width: number, height: number) => {
+            getCanvasInfo(canvasId).context.strokeRect(x, y, width, height);
+        },
+        width: (canvasId: number): number => {
+            return getCanvasInfo(canvasId).canvas.width;
+        },
 
-        fill_text: (textPtr: number, textLen: number, x: number, y: number) => {
+        fill_text: (canvasId: number, textPtr: number, textLen: number, x: number, y: number) => {
             const text = decodeWasmString(textPtr, textLen);
-            ctx.fillText(text, x, y);
+            getCanvasInfo(canvasId).context.fillText(text, x, y);
         },
-        set_font: (fontPtr: number, fontLen: number) => {
+        set_font: (canvasId: number, fontPtr: number, fontLen: number) => {
             const font = decodeWasmString(fontPtr, fontLen);
-            ctx.font = font;
+            getCanvasInfo(canvasId).context.font = font;
         },
-        set_text_align: (alignPtr: number, alignLen: number) => {
+        set_text_align: (canvasId: number, alignPtr: number, alignLen: number) => {
             const align = decodeWasmString(alignPtr, alignLen);
-            ctx.textAlign = align as CanvasTextAlign;
+            getCanvasInfo(canvasId).context.textAlign = align as CanvasTextAlign;
         },
     };
 }
@@ -125,62 +167,55 @@ async function loadWasm(): Promise<void> {
     }
 }
 
+// Function to register a canvas and return its integer ID
+function registerCanvas(canvasName: string, canvasId: number, width: number, height: number) {
+    const canvas = document.getElementById(canvasName)! as HTMLCanvasElement;
+    const context = canvas.getContext('2d')!;
+
+    canvas.width = width;
+    canvas.height = height;
+    canvasRegistry.set(canvasId, { canvas, context });
+}
+
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', async () => {
-    // Set up the canvas
-    canvas = document.getElementById('canvas') as HTMLCanvasElement;
-    if (!canvas) {
-        console.error("Canvas element not found");
-        return;
-    }
-
-    ctx = canvas.getContext('2d')!; // Use non-null assertion to ensure ctx is not null
-
-    canvas.width = CANVAS_WIDTH;
-    canvas.height = CANVAS_HEIGHT;
+    // Set up the canvases
+    registerCanvas('step-canvas',      STEP_CANVAS_ID,      CANVAS_WIDTH, CANVAS_HEIGHT);
+    registerCanvas('animation-canvas', ANIMATION_CANVAS_ID, CANVAS_WIDTH, CANVAS_HEIGHT);
 
     // Load the WebAssembly module
     await loadWasm();
 
     // Add event listeners for buttons
-    const stepFunctionButton = document.getElementById('plot-step')! as HTMLButtonElement;
     const playPauseButton = document.getElementById('play-pause')! as HTMLButtonElement;
     const stopButton = document.getElementById('stop')! as HTMLButtonElement;
     const backwardButton = document.getElementById('backward')! as HTMLButtonElement;
     const forwardButton = document.getElementById('forward')! as HTMLButtonElement;
-    const cutoffInput = document.getElementById('cutoff')! as HTMLInputElement;
+    const stepCutoffInput = document.getElementById('step-cutoff')! as HTMLInputElement;
+    const animationCutoffInput = document.getElementById('animation-cutoff')! as HTMLInputElement;
 
-    stepFunctionButton.addEventListener('click', () => {
-        cutoffControl = true;
-        window.plot_step(parseInt(cutoffInput.value, 10));
+    stepCutoffInput.addEventListener('change', () => {
+        window.plot_step(STEP_CANVAS_ID, parseInt(stepCutoffInput.value, 10));
     });
 
-    cutoffInput.addEventListener('change', () => {
-        if (cutoffControl) {
-            stepFunctionButton.click();
-        } else {
-            stopButton.click();
-            playPauseButton.click();
-        }
+    animationCutoffInput.addEventListener('change', () => {
+        stopButton.click();
+        playPauseButton.click();
     });
 
     playPauseButton.addEventListener('click', () => {
-        cutoffControl = false;
-        window.play_pause_animation(parseInt(cutoffInput.value, 10));
+        window.play_pause_animation(ANIMATION_CANVAS_ID, parseInt(animationCutoffInput.value, 10));
     });
 
-    stopButton.addEventListener('click', () => {
-        window.stop_animation();
-    });
-
-    backwardButton.addEventListener('click', () => {
-        window.decrease_animation_speed();
-    });
-
-    forwardButton.addEventListener('click', () => {
-        window.increase_animation_speed();
-    });
+    stopButton.addEventListener('click',     () => { window.stop_animation();           });
+    backwardButton.addEventListener('click', () => { window.decrease_animation_speed(); });
+    forwardButton.addEventListener('click',  () => { window.increase_animation_speed(); });
 
     // Initial plot
-    stepFunctionButton.click();
+    stepCutoffInput.dispatchEvent(new Event('change'));
+
+    playPauseButton.click();
+    setTimeout(() => {
+        playPauseButton.click();
+    }, 10);
 });

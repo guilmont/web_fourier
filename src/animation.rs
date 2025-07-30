@@ -22,6 +22,9 @@ pub struct Fourier {
     fourier_x: math::Fourier,
     fourier_y: math::Fourier,
 
+    // Canvas
+    canvas: canvas::Canvas,
+
     // Animation control
     current_point: f64,
     point_speed: f64,
@@ -39,10 +42,11 @@ impl Fourier {
     /// * `x_data` - A vector of x-coordinates.
     /// * `y_data` - A vector of y-coordinates.
     /// * `cutoff` - The maximum frequency to include in the Fourier series.
+    /// * `canvas_id` - The ID of the canvas to draw on.
     ///
     /// # Returns
     /// A `Result` containing the `Fourier` instance or an error message.
-    pub fn new(x_data: Vec<f32>, y_data: Vec<f32>, cutoff: usize) -> Result<Self, String> {
+    pub fn new(x_data: Vec<f32>, y_data: Vec<f32>, cutoff: usize, canvas_id: u32) -> Result<Self, String> {
         if x_data.len() != y_data.len() {
             return Err("X and Y data must have same length".into());
         }
@@ -50,6 +54,7 @@ impl Fourier {
         Ok(Fourier {
             fourier_x: math::Fourier::new(x_data, cutoff)?,
             fourier_y: math::Fourier::new(y_data, cutoff)?,
+            canvas: canvas::Canvas::new(canvas_id),
             current_point: 0.0,
             point_speed: 1.0,
             is_paused: true,
@@ -83,7 +88,7 @@ impl Fourier {
 
         let current_point = (self.fourier_x.size() + self.current_point as usize) % self.fourier_x.size();
 
-        let mut plt = Self::setup_plotter();
+        let mut plt = Self::setup_plotter_from_canvas(&self.canvas);
         self.plot_original_curve(&mut plt);
         self.plot_reconstructed_curve(&mut plt, current_point);
         self.plot_fourier_components(&mut plt, current_point);
@@ -116,8 +121,8 @@ impl Fourier {
     /////////////////////////////////////////////////////////////////////////////////////
 
     /// Configures and returns a new plotter instance with predefined ranges.
-    fn setup_plotter() -> plotter::Plotter {
-        let mut plt = plotter::Plotter::new();
+    fn setup_plotter_from_canvas(canvas: &canvas::Canvas) -> plotter::Plotter {
+        let mut plt = plotter::Plotter::new(canvas.id());
         plt.set_x_range(X_RANGE.0, X_RANGE.1);
         plt.set_y_range(Y_RANGE.0, Y_RANGE.1);
         plt
