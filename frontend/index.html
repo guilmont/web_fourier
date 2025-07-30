@@ -7,14 +7,15 @@
 </head>
 <body>
     <div class="container">
-        <h1>Rust WebAssembly Canvas</h1>
         <canvas id="canvas" width="800" height="600"></canvas>
-        <div class="controls">
-            <button id="random-pattern">Plot Random Pattern</button>
-            <button id="plot-multiple">Plot Multiple Functions</button>
+        <div>
             <button id="plot-step">Plot Step Function</button>
-            <button id="animate">Animate</button>
             <input type="number" id="cutoff" placeholder="Cutoff Frequency" value="8" min="1" max="100">
+        </div><div>
+            <button id="backward" title="Backward">&#9664;&#9664;</button>
+            <button id="play-pause" title="Play/Pause">&#9654;&#9208;</button>
+            <button id="stop" title="Stop">&#9209;</button>
+            <button id="forward" title="Forward">&#9654;&#9654;</button>
         </div>
     </div>
 

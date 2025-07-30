@@ -1,9 +1,11 @@
 declare global {
     interface Window {
-        draw_random_pattern: any;
         plot_step: any;
-        plot_multiple_functions: any;
-        animate_fourier: any;
+        step_animation: any;
+        play_pause_animation: any;
+        stop_animation: any;
+        increase_animation_speed: any;
+        decrease_animation_speed: any;
     }
 }
 
