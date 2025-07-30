@@ -5,8 +5,8 @@ use crate::canvas;
 mod js {
     #[link(wasm_import_module = "Animation")]
     extern "C" {
-        pub fn start_animation_loop();
-        pub fn stop_animation_loop();
+        pub fn start_animation_loop(canvas_id: u32);
+        pub fn stop_animation_loop(canvas_id: u32);
     }
 }
 
@@ -64,14 +64,14 @@ impl Fourier {
 
     /// Start the self-contained animation loop
     pub fn start(&mut self) {
-        unsafe { js::start_animation_loop(); }
+        unsafe { js::start_animation_loop(self.canvas.id()); }
         self.is_paused = false;
         self.is_stopped = false;
     }
 
     /// Stop the animation loop
     pub fn stop(&mut self) {
-        unsafe { js::stop_animation_loop(); }
+        unsafe { js::stop_animation_loop(self.canvas.id()); }
         self.is_stopped = true;
         self.current_point = 0.0;
     }

@@ -6,23 +6,23 @@ const STEP_CANVAS_ID = 1;
 const ANIMATION_CANVAS_ID = 2;
 let canvasRegistry = new Map();
 let wasmMemory;
-// Global animation loop control
-let animationId = null;
 function createAnimationImports() {
     return {
-        start_animation_loop: () => {
-            if (animationId !== null)
+        start_animation_loop: (canvasId) => {
+            const canvasInfo = getCanvasInfo(canvasId);
+            if (canvasInfo.animationId !== null)
                 return; // Already running
             function animationFrame() {
                 window.step_animation();
-                animationId = requestAnimationFrame(animationFrame);
+                canvasInfo.animationId = requestAnimationFrame(animationFrame);
             }
-            animationId = requestAnimationFrame(animationFrame);
+            canvasInfo.animationId = requestAnimationFrame(animationFrame);
         },
-        stop_animation_loop: () => {
-            if (animationId !== null) {
-                cancelAnimationFrame(animationId);
-                animationId = null;
+        stop_animation_loop: (canvasId) => {
+            const canvasInfo = getCanvasInfo(canvasId);
+            if (canvasInfo.animationId !== null) {
+                cancelAnimationFrame(canvasInfo.animationId);
+                canvasInfo.animationId = null;
             }
         },
     };
@@ -43,75 +43,58 @@ function getCanvasInfo(canvasId) {
 function createCanvasImports() {
     return {
         arc: (canvasId, x, y, radius, startAngle, endAngle) => {
-            const { context } = getCanvasInfo(canvasId);
-            context.arc(x, y, radius, startAngle, endAngle);
+            getCanvasInfo(canvasId).context.arc(x, y, radius, startAngle, endAngle);
         },
         begin_path: (canvasId) => {
-            const { context } = getCanvasInfo(canvasId);
-            context.beginPath();
+            getCanvasInfo(canvasId).context.beginPath();
         },
         clear_rect: (canvasId, x, y, width, height) => {
-            const { context } = getCanvasInfo(canvasId);
-            context.clearRect(x, y, width, height);
+            getCanvasInfo(canvasId).context.clearRect(x, y, width, height);
         },
         fill: (canvasId) => {
-            const { context } = getCanvasInfo(canvasId);
-            context.fill();
+            getCanvasInfo(canvasId).context.fill();
         },
         fill_rect: (canvasId, x, y, width, height) => {
-            const { context } = getCanvasInfo(canvasId);
-            context.fillRect(x, y, width, height);
+            getCanvasInfo(canvasId).context.fillRect(x, y, width, height);
         },
         height: (canvasId) => {
-            const { canvas } = getCanvasInfo(canvasId);
-            return canvas.height;
+            return getCanvasInfo(canvasId).canvas.height;
         },
         line_to: (canvasId, x, y) => {
-            const { context } = getCanvasInfo(canvasId);
-            context.lineTo(x, y);
+            getCanvasInfo(canvasId).context.lineTo(x, y);
         },
         move_to: (canvasId, x, y) => {
-            const { context } = getCanvasInfo(canvasId);
-            context.moveTo(x, y);
+            getCanvasInfo(canvasId).context.moveTo(x, y);
         },
         set_fill_style_color: (canvasId, r, g, b, a) => {
-            const { context } = getCanvasInfo(canvasId);
-            context.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
+            getCanvasInfo(canvasId).context.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
         },
         set_line_width: (canvasId, width) => {
-            const { context } = getCanvasInfo(canvasId);
-            context.lineWidth = width;
+            getCanvasInfo(canvasId).context.lineWidth = width;
         },
         set_stroke_style_color: (canvasId, r, g, b, a) => {
-            const { context } = getCanvasInfo(canvasId);
-            context.strokeStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
+            getCanvasInfo(canvasId).context.strokeStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
         },
         stroke: (canvasId) => {
-            const { context } = getCanvasInfo(canvasId);
-            context.stroke();
+            getCanvasInfo(canvasId).context.stroke();
         },
         stroke_rect: (canvasId, x, y, width, height) => {
-            const { context } = getCanvasInfo(canvasId);
-            context.strokeRect(x, y, width, height);
+            getCanvasInfo(canvasId).context.strokeRect(x, y, width, height);
         },
         width: (canvasId) => {
-            const { canvas } = getCanvasInfo(canvasId);
-            return canvas.width;
+            return getCanvasInfo(canvasId).canvas.width;
         },
         fill_text: (canvasId, textPtr, textLen, x, y) => {
-            const { context } = getCanvasInfo(canvasId);
             const text = decodeWasmString(textPtr, textLen);
-            context.fillText(text, x, y);
+            getCanvasInfo(canvasId).context.fillText(text, x, y);
         },
         set_font: (canvasId, fontPtr, fontLen) => {
-            const { context } = getCanvasInfo(canvasId);
             const font = decodeWasmString(fontPtr, fontLen);
-            context.font = font;
+            getCanvasInfo(canvasId).context.font = font;
         },
         set_text_align: (canvasId, alignPtr, alignLen) => {
-            const { context } = getCanvasInfo(canvasId);
             const align = decodeWasmString(alignPtr, alignLen);
-            context.textAlign = align;
+            getCanvasInfo(canvasId).context.textAlign = align;
         },
     };
 }
@@ -165,18 +148,10 @@ async function loadWasm() {
 // Function to register a canvas and return its integer ID
 function registerCanvas(canvasName, canvasId, width, height) {
     const canvas = document.getElementById(canvasName);
-    if (!canvas) {
-        console.error(`Canvas element with id '${canvasName}' not found`);
-        return null;
-    }
     const context = canvas.getContext('2d');
-    if (!context) {
-        console.error(`Failed to get 2D context for canvas '${canvasName}'`);
-        return null;
-    }
     canvas.width = width;
     canvas.height = height;
-    canvasRegistry.set(canvasId, { canvas, context });
+    canvasRegistry.set(canvasId, { canvas, context, animationId: null });
 }
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', async () => {

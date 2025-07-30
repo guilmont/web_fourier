@@ -51,28 +51,6 @@ mod js {
     }
 }
 
-/// Basic calls on canvas API ////////////////////////////////////////////////////////////
-/// These are low-level functions used internally by the Canvas struct.
-/// Prefer using the Canvas struct for higher-level operations.
-
-fn arc(canvas_id: u32, x: f32, y: f32, radius: f32, start_angle: f32, end_angle: f32) { unsafe { js::arc(canvas_id, x, y, radius, start_angle, end_angle);   } }
-fn begin_path(canvas_id: u32)                                                         { unsafe { js::begin_path(canvas_id);                                } }
-fn clear_rect(canvas_id: u32, x: f32, y: f32, width: f32, height: f32)                { unsafe { js::clear_rect(canvas_id, x, y, width, height);             } }
-fn fill(canvas_id: u32)                                                               { unsafe { js::fill(canvas_id);                                      } }
-fn fill_rect(canvas_id: u32, x: f32, y: f32, width: f32, height: f32)                 { unsafe { js::fill_rect(canvas_id, x, y, width, height);              } }
-fn height(canvas_id: u32) -> f32                                                      { unsafe { js::height(canvas_id)                                     } }
-fn line_to(canvas_id: u32, x: f32, y: f32)                                            { unsafe { js::line_to(canvas_id, x, y);                               } }
-fn move_to(canvas_id: u32, x: f32, y: f32)                                            { unsafe { js::move_to(canvas_id, x, y);                               } }
-fn set_fill_color(canvas_id: u32, r: u8, g: u8, b: u8, a: f32)                        { unsafe { js::set_fill_style_color(canvas_id, r, g, b, a);            } }
-fn set_line_width(canvas_id: u32, width: f32)                                         { unsafe { js::set_line_width(canvas_id, width);                       } }
-fn set_stroke_color(canvas_id: u32, r: u8, g: u8, b: u8, a: f32)                      { unsafe { js::set_stroke_style_color(canvas_id, r, g, b, a);          } }
-fn stroke(canvas_id: u32)                                                             { unsafe { js::stroke(canvas_id);                                    } }
-fn stroke_rect(canvas_id: u32, x: f32, y: f32, width: f32, height: f32)               { unsafe { js::stroke_rect(canvas_id, x, y, width, height);            } }
-fn width(canvas_id: u32) -> f32                                                       { unsafe { js::width(canvas_id)                                      } }
-fn fill_text(canvas_id: u32, text: &str, x: f32, y: f32)                              { unsafe { js::fill_text(canvas_id, text.as_ptr(), text.len(), x, y);  } }
-fn set_font(canvas_id: u32, font: &str)                                               { unsafe { js::set_font(canvas_id, font.as_ptr(), font.len());         } }
-fn set_text_align(canvas_id: u32, align: &str)                                        { unsafe { js::set_text_align(canvas_id, align.as_ptr(), align.len()); } }
-
 /// Canvas object that encapsulates canvas operations ///////////////////////////////////
 
 pub struct Canvas {
@@ -81,90 +59,80 @@ pub struct Canvas {
 
 impl Canvas {
     /// Create a new Canvas instance for the given canvas ID
-    pub fn new(canvas_id: u32) -> Self {
-        Self {
-            id: canvas_id,
-        }
-    }
+    pub fn new(canvas_id: u32) -> Self { Self { id: canvas_id } }
 
     /// Get the canvas ID
-    pub fn id(&self) -> u32 {
-        self.id
-    }
+    pub fn id(&self) -> u32 { self.id }
 
     /// Get canvas width
-    pub fn width(&self) -> f32 {
-        width(self.id)
-    }
+    pub fn width(&self) -> f32 { unsafe { js::width(self.id) } }
 
     /// Get canvas height
-    pub fn height(&self) -> f32 {
-        height(self.id)
-    }
+    pub fn height(&self) -> f32 { unsafe { js::height(self.id) } }
 
-    /// Basic drawing operations
-    pub fn arc(&self, x: f32, y: f32, radius: f32, start_angle: f32, end_angle: f32) {
-        arc(self.id, x, y, radius, start_angle, end_angle);
-    }
+    /// Begin a new path for drawing
+    pub fn begin_path(&self) { unsafe { js::begin_path(self.id) } }
 
-    pub fn begin_path(&self) {
-        begin_path(self.id);
-    }
-
+    /// Clear a rectangular area on the canvas
     pub fn clear_rect(&self, x: f32, y: f32, width: f32, height: f32) {
-        clear_rect(self.id, x, y, width, height);
+        unsafe { js::clear_rect(self.id, x, y, width, height) };
     }
 
-    pub fn fill(&self) {
-        fill(self.id);
-    }
+    /// Fill the current drawing path
+    pub fn fill(&self) { unsafe { js::fill(self.id) } }
 
+    /// Fill a rectangle with the specified dimensions
     pub fn fill_rect(&self, x: f32, y: f32, width: f32, height: f32) {
-        fill_rect(self.id, x, y, width, height);
+        unsafe { js::fill_rect(self.id, x, y, width, height) };
     }
 
-    pub fn line_to(&self, x: f32, y: f32) {
-        line_to(self.id, x, y);
-    }
+    /// Draw a line to the specified coordinates
+    pub fn line_to(&self, x: f32, y: f32) { unsafe { js::line_to(self.id, x, y) } }
 
-    pub fn move_to(&self, x: f32, y: f32) {
-        move_to(self.id, x, y);
-    }
+    /// Move the drawing cursor to the specified coordinates
+    pub fn move_to(&self, x: f32, y: f32) { unsafe { js::move_to(self.id, x, y) } }
 
+    /// Set the fill color for subsequent drawing operations
     pub fn set_fill_color(&self, r: u8, g: u8, b: u8, a: f32) {
-        set_fill_color(self.id, r, g, b, a);
+        unsafe { js::set_fill_style_color(self.id, r, g, b, a) };
     }
 
-    pub fn set_line_width(&self, width: f32) {
-        set_line_width(self.id, width);
-    }
+    /// Set the line width for subsequent drawing operations
+    pub fn set_line_width(&self, width: f32) { unsafe { js::set_line_width(self.id, width) } }
 
+    /// Set the stroke color for subsequent drawing operations
     pub fn set_stroke_color(&self, r: u8, g: u8, b: u8, a: f32) {
-        set_stroke_color(self.id, r, g, b, a);
+        unsafe { js::set_stroke_style_color(self.id, r, g, b, a) };
     }
 
-    pub fn stroke(&self) {
-        stroke(self.id);
-    }
+    /// Stroke the current drawing path
+    pub fn stroke(&self) { unsafe { js::stroke(self.id) } }
 
+    /// Stroke a rectangle with the specified dimensions
     pub fn stroke_rect(&self, x: f32, y: f32, width: f32, height: f32) {
-        stroke_rect(self.id, x, y, width, height);
+        unsafe { js::stroke_rect(self.id, x, y, width, height) };
     }
 
+    /// Draw text at the specified coordinates
     pub fn fill_text(&self, text: &str, x: f32, y: f32) {
-        fill_text(self.id, text, x, y);
+        unsafe { js::fill_text(self.id, text.as_ptr(), text.len(), x, y) };
     }
 
+    /// Set the font for text drawing operations
     pub fn set_font(&self, font: &str) {
-        set_font(self.id, font);
+        unsafe { js::set_font(self.id, font.as_ptr(), font.len()) };
     }
 
+    /// Set the text alignment for text drawing operations
     pub fn set_text_align(&self, align: &str) {
-        set_text_align(self.id, align);
+        unsafe { js::set_text_align(self.id, align.as_ptr(), align.len()) };
     }
 
-    /// Higher-level drawing operations
-    
+     /// Draw an arc at (x, y) with a given radius, start angle, and end angle (in radians)
+    pub fn arc(&self, x: f32, y: f32, radius: f32, start_angle: f32, end_angle: f32) {
+        unsafe { js::arc(self.id, x, y, radius, start_angle, end_angle) };
+    }
+
     /// Clears the entire canvas
     pub fn clear(&self) {
         self.clear_rect(0.0, 0.0, self.width(), self.height());

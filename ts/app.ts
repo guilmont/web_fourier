@@ -8,28 +8,28 @@ const ANIMATION_CANVAS_ID = 2;
 interface CanvasInfo {
     canvas: HTMLCanvasElement;
     context: CanvasRenderingContext2D;
+    animationId: number | null; // Animation loop id for this canvas
 }
 
 let canvasRegistry: Map<number, CanvasInfo> = new Map();
 let wasmMemory: WebAssembly.Memory;
 
-// Global animation loop control
-let animationId: number | null = null;
-
 function createAnimationImports() {
     return {
-        start_animation_loop:  () => {
-            if (animationId !== null) return; // Already running
+        start_animation_loop:  (canvasId: number) => {
+            const canvasInfo = getCanvasInfo(canvasId);
+            if (canvasInfo.animationId !== null) return; // Already running
             function animationFrame() {
                 window.step_animation();
-                animationId = requestAnimationFrame(animationFrame);
+                canvasInfo.animationId = requestAnimationFrame(animationFrame);
             }
-            animationId = requestAnimationFrame(animationFrame);
+            canvasInfo.animationId = requestAnimationFrame(animationFrame);
         },
-        stop_animation_loop:   () => {
-            if (animationId !== null) {
-                cancelAnimationFrame(animationId);
-                animationId = null;
+        stop_animation_loop:   (canvasId: number) => {
+            const canvasInfo = getCanvasInfo(canvasId);
+            if (canvasInfo.animationId !== null) {
+                cancelAnimationFrame(canvasInfo.animationId);
+                canvasInfo.animationId = null;
             }
         },
     };
@@ -174,7 +174,7 @@ function registerCanvas(canvasName: string, canvasId: number, width: number, hei
 
     canvas.width = width;
     canvas.height = height;
-    canvasRegistry.set(canvasId, { canvas, context });
+    canvasRegistry.set(canvasId, { canvas, context, animationId: null });
 }
 
 // Initialize when page loads
