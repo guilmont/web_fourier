@@ -132,7 +132,7 @@ async function loadWasm() {
         });
         const expo = wasmModule.instance.exports;
         wasmMemory = expo.memory;
-        window.plot_step = expo.plot_step;
+        window.plot_example = expo.plot_example;
         // New self-contained Rust animation functions
         window.step_animation = expo.step_animation;
         window.play_pause_animation = expo.play_pause_animation;
@@ -167,8 +167,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     const forwardButton = document.getElementById('forward');
     const stepCutoffInput = document.getElementById('step-cutoff');
     const animationCutoffInput = document.getElementById('animation-cutoff');
-    stepCutoffInput.addEventListener('change', () => {
-        window.plot_step(STEP_CANVAS_ID, parseInt(stepCutoffInput.value, 10));
+    // Track current example
+    let currentExample = 0; // 0=step, 1=sine, 2=square, 3=triangle
+    function plotCurrentExample() {
+        const cutoff = parseInt(stepCutoffInput.value, 10);
+        window.plot_example(STEP_CANVAS_ID, cutoff, currentExample);
+    }
+    stepCutoffInput.addEventListener('change', plotCurrentExample);
+    // Example buttons
+    document.querySelectorAll('.example-btn').forEach((btn, idx) => {
+        btn.addEventListener('click', (e) => {
+            currentExample = idx;
+            // Highlight selected
+            document.querySelectorAll('.example-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            plotCurrentExample();
+        });
     });
     animationCutoffInput.addEventListener('change', () => {
         stopButton.click();
@@ -180,8 +194,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     stopButton.addEventListener('click', () => { window.stop_animation(); });
     backwardButton.addEventListener('click', () => { window.decrease_animation_speed(); });
     forwardButton.addEventListener('click', () => { window.increase_animation_speed(); });
-    // Initial plot
-    stepCutoffInput.dispatchEvent(new Event('change'));
+    // Initial plot and highlight
+    document.querySelector('.example-btn[data-example="step"]')?.classList.add('active');
+    plotCurrentExample();
     playPauseButton.click();
     setTimeout(() => {
         playPauseButton.click();

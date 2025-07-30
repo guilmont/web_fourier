@@ -5,25 +5,50 @@ mod plotter;
 mod browser;
 mod animation;
 
-fn plot_step_internal(canvas_id: u32, cutoff: usize) {
-    const STEP_START: usize = 150;
-    const STEP_END: usize = 350;
-
-    let mut t = vec![0.0; 500];
-    let mut x = vec![0.0; 500];
-    for i in 0..t.len() {
-        t[i] = i as f32 / 100.0;
-        if i > STEP_START && i < STEP_END { x[i] = 1.0; }
+fn get_example_data(kind: u32) -> (Vec<f32>, Vec<f32>) {
+    const TOTAL_NUM_POINTS: usize = 500;
+    let mut t = vec![0.0; TOTAL_NUM_POINTS];
+    let mut x = vec![0.0; TOTAL_NUM_POINTS];
+    match kind {
+        0 /* STEP */ => {
+            for i in 0..TOTAL_NUM_POINTS {
+                t[i] = i as f32 / 100.0;
+                if i > 150 && i < 350 { x[i] = 1.0; }
+            }
+        },
+        1 /* SINE */ => {
+            for i in 0..TOTAL_NUM_POINTS {
+                t[i] = i as f32 / 100.0;
+                x[i] = (2.0 * std::f32::consts::PI * t[i]).sin();
+            }
+        },
+        2 /* SQUARE */ => {
+            for i in 0..t.len() {
+                t[i] = i as f32 / 100.0;
+                x[i] = if (2.0 * std::f32::consts::PI * t[i]).sin() >= 0.0 { 1.0 } else { -1.0 };
+            }
+        },
+        _ /* TRIANGLE */ => {
+            for i in 0..t.len() {
+                t[i] = i as f32 / 100.0;
+                x[i] = 2.0 * (2.0 * (t[i] - (t[i] + 0.25).floor() + 0.25)).abs() - 1.0;
+            }
+        },
     }
+    (t,x)
+}
 
+
+#[no_mangle]
+pub fn plot_example(canvas_id: u32, cutoff: usize, kind: u32) {
+    let (t, x) = get_example_data(kind);
     let fourier = match math::Fourier::new(x, cutoff) {
         Ok(val) => val,
         Err(msg) => { browser::alert(&format!("Error in low-pass filter: {}", msg)); return; }
     };
     let mut plt = plotter::Plotter::new(canvas_id);
-
     if let Err(msg) = plt.plot_line(&t, fourier.original(), canvas::TAB_BLUE, 2.0) {
-        console::error(&format!("Error plotting step function: {}", msg));
+        console::error(&format!("Error plotting function: {}", msg));
         return;
     }
     if let Err(msg) = plt.plot_line(&t, fourier.filtered(), canvas::TAB_ORANGE, 2.0) {
@@ -33,10 +58,6 @@ fn plot_step_internal(canvas_id: u32, cutoff: usize) {
     plt.show();
 }
 
-#[no_mangle]
-pub fn plot_step(canvas_id: u32, cutoff: usize) {
-    plot_step_internal(canvas_id, cutoff);
-}
 
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
@@ -107,10 +128,7 @@ pub fn stop_animation() {
 
 #[no_mangle]
 pub fn increase_animation_speed() {
-    unsafe { if let Some(ref mut var) = ANIMATION {
-
-        var.set_speed(var.speed() + 0.5);
-    } }
+    unsafe { if let Some(ref mut var) = ANIMATION { var.set_speed(var.speed() + 0.5); } }
 }
 
 #[no_mangle]
