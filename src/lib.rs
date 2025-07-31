@@ -36,41 +36,24 @@ thread_local! {
 /// Example data
 ///////////////////////////////////////////////////////////////////////////////
 
-fn get_example_data(kind: u32) -> (Vec<f32>, Vec<f32>) {
-    const TOTAL_NUM_POINTS: usize = 500;
-    let mut t = vec![0.0; TOTAL_NUM_POINTS];
-    let mut x = vec![0.0; TOTAL_NUM_POINTS];
-    match kind {
-        0 /* STEP */ => {
-            for i in 0..TOTAL_NUM_POINTS {
-                t[i] = i as f32 / 100.0;
-                if i > 150 && i < 350 { x[i] = 1.0; }
-            }
-        },
-        1 /* SINE */ => {
-            for i in 0..TOTAL_NUM_POINTS {
-                t[i] = i as f32 / 100.0;
-                x[i] = (2.0 * std::f32::consts::PI * t[i]).sin();
-            }
-        },
-        2 /* SQUARE */ => {
-            for i in 0..t.len() {
-                t[i] = i as f32 / 100.0;
-                x[i] = if (2.0 * std::f32::consts::PI * t[i]).sin() >= 0.0 { 1.0 } else { -1.0 };
-            }
-        },
-        _ /* TRIANGLE */ => {
-            for i in 0..t.len() {
-                t[i] = i as f32 / 100.0;
-                x[i] = 2.0 * (2.0 * (t[i] - (t[i] + 0.25).floor() + 0.25)).abs() - 1.0;
-            }
-        },
-    }
-    (t,x)
-}
-
 fn generate_cache(kind: u32) -> ExampleCache {
-    let (t, x) = get_example_data(kind);
+    const TOTAL_NUM_POINTS: usize = 500;
+    let mut t = Vec::with_capacity(TOTAL_NUM_POINTS);
+    let mut x = Vec::with_capacity(TOTAL_NUM_POINTS);
+
+    let generator: fn(f32, usize) -> f32 = match kind {
+        /* Step function */ 0 => |_, i|  { if i > 150 && i < 350  { 1.0 } else { 0.0 }                             },
+        /* Sine */          1 => |ti, _| { (2.0 * std::f32::consts::PI * ti).sin()                                 },
+        /* Square */        2 => |ti, _| { if (2.0 * std::f32::consts::PI * ti).sin() >= 0.0 { 1.0 } else { -1.0 } },
+        /* Triangle */      _ => |ti, _| { 2.0 * (2.0 * (ti - (ti + 0.25).floor() + 0.25)).abs() - 1.0             },
+    };
+
+    for i in 0..TOTAL_NUM_POINTS {
+        let ti = i as f32 / 100.0;
+        t.push(ti);
+        x.push(generator(ti, i));
+    }
+
     let fourier = match math::Fourier::new(x) {
         Ok(fourier) => fourier,
         Err(msg) => {
