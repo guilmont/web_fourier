@@ -21,6 +21,8 @@ pub struct Fourier {
     // Fourier data
     fourier_x: math::Fourier,
     fourier_y: math::Fourier,
+    k_min: usize,
+    k_max: usize,
 
     // Canvas
     canvas: canvas::Canvas,
@@ -46,14 +48,15 @@ impl Fourier {
     ///
     /// # Returns
     /// A `Result` containing the `Fourier` instance or an error message.
-    pub fn new(x_data: Vec<f32>, y_data: Vec<f32>, cutoff: usize, canvas_id: u32) -> Result<Self, String> {
+    pub fn new(x_data: Vec<f32>, y_data: Vec<f32>, k_min: usize, k_max: usize, canvas_id: u32) -> Result<Self, String> {
         if x_data.len() != y_data.len() {
             return Err("X and Y data must have same length".into());
         }
-
         Ok(Fourier {
-            fourier_x: math::Fourier::new(x_data, cutoff)?,
-            fourier_y: math::Fourier::new(y_data, cutoff)?,
+            fourier_x: math::Fourier::new(x_data)?,
+            fourier_y: math::Fourier::new(y_data)?,
+            k_min,
+            k_max,
             canvas: canvas::Canvas::new(canvas_id),
             current_point: 0.0,
             point_speed: 1.0,
@@ -140,8 +143,9 @@ impl Fourier {
 
     /// Plots the reconstructed curve up to the current frequency on the given plotter.
     fn plot_reconstructed_curve(&self, plt: &mut plotter::Plotter, current_point: usize) {
-        let mut recon_x = self.fourier_x.filtered().to_vec();
-        let mut recon_y = self.fourier_y.filtered().to_vec();
+        let (k_min, k_max) = self.clamped_frequency_range();
+        let mut recon_x = self.fourier_x.filtered_range(k_min, k_max).unwrap_or_else(|_| vec![0.0; self.fourier_x.size()]);
+        let mut recon_y = self.fourier_y.filtered_range(k_min, k_max).unwrap_or_else(|_| vec![0.0; self.fourier_y.size()]);
         recon_x.truncate(current_point + 1);
         recon_y.truncate(current_point + 1);
         let _ = plt.plot_line(&recon_x, &recon_y, canvas::TAB_ORANGE, LINE_WIDTH_RECONSTRUCTED);
@@ -151,7 +155,8 @@ impl Fourier {
     fn plot_fourier_components(&self, plt: &mut plotter::Plotter, current_point: usize) {
         let mut current_x = 0.0;
         let mut current_y = 0.0;
-        for k in 1..=self.fourier_x.cutoff() {
+        let (k_min, k_max) = self.clamped_frequency_range();
+        for k in k_min..=k_max {
             if let (Ok(next_x), Ok(next_y)) = (
                 self.fourier_x.get_component(k, current_point),
                 self.fourier_y.get_component(k, current_point),
@@ -163,5 +168,13 @@ impl Fourier {
                 current_y = next_y;
             }
         }
+    }
+
+    /// Returns the clamped frequency range (k_min, k_max) based on the maximum frequency.
+    fn clamped_frequency_range(&self) -> (usize, usize) {
+        let max_k = self.fourier_x.max_frequency();
+        let k_min = if self.k_min > max_k { max_k } else { self.k_min };
+        let k_max = if self.k_max > max_k { max_k } else { self.k_max };
+        (k_min, k_max)
     }
 }

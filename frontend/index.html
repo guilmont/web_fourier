@@ -18,8 +18,9 @@
                 <button class="example-btn" data-example="triangle">Triangle</button>
             </div>
             <div>
-                <b>Frequency threshold:</b>
-                <input type="number" id="step-cutoff" value="8" min="1" max="100">
+                <b>Frequency range:</b>
+                <label>From <input type="number" id="step-freq-min" value="0" min="0" max="100" style="width:4em"></label>
+                <label>to <input type="number" id="step-cutoff" value="8" min="1" max="100" style="width:4em"></label>
             </div>
         </div>
 
@@ -32,8 +33,9 @@
                 <button id="stop" title="Stop">&#9209;</button>
                 <button id="forward" title="Forward">&#9654;&#9654;</button>
 
-                <b>Frequency threshold:</b>
-                <input type="number" id="animation-cutoff"  value="8" min="1" max="100">
+                <b>Frequency range:</b>
+                <label>From <input type="number" id="animation-freq-min" value="1" min="0" max="100" style="width:4em"></label>
+                <label>to <input type="number" id="animation-cutoff"  value="8" min="1" max="100" style="width:4em"></label>
             </div>
         </div>
     </div>

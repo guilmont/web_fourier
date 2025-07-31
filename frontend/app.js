@@ -166,14 +166,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     const backwardButton = document.getElementById('backward');
     const forwardButton = document.getElementById('forward');
     const stepCutoffInput = document.getElementById('step-cutoff');
+    const stepFreqMinInput = document.getElementById('step-freq-min');
     const animationCutoffInput = document.getElementById('animation-cutoff');
+    const animationFreqMinInput = document.getElementById('animation-freq-min');
     // Track current example
     let currentExample = 0; // 0=step, 1=sine, 2=square, 3=triangle
     function plotCurrentExample() {
-        const cutoff = parseInt(stepCutoffInput.value, 10);
-        window.plot_example(STEP_CANVAS_ID, cutoff, currentExample);
+        const kMin = parseInt(stepFreqMinInput.value, 10);
+        const kMax = parseInt(stepCutoffInput.value, 10);
+        window.plot_example(STEP_CANVAS_ID, kMin, kMax, currentExample);
     }
     stepCutoffInput.addEventListener('change', plotCurrentExample);
+    stepFreqMinInput.addEventListener('change', plotCurrentExample);
     // Example buttons
     document.querySelectorAll('.example-btn').forEach((btn, idx) => {
         btn.addEventListener('click', (e) => {
@@ -184,12 +188,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             plotCurrentExample();
         });
     });
-    animationCutoffInput.addEventListener('change', () => {
+    function restartAnimation() {
         stopButton.click();
         playPauseButton.click();
-    });
+    }
+    animationCutoffInput.addEventListener('change', restartAnimation);
+    animationFreqMinInput.addEventListener('change', restartAnimation);
     playPauseButton.addEventListener('click', () => {
-        window.play_pause_animation(ANIMATION_CANVAS_ID, parseInt(animationCutoffInput.value, 10));
+        const kMin = parseInt(animationFreqMinInput.value, 10);
+        const kMax = parseInt(animationCutoffInput.value, 10);
+        window.play_pause_animation(ANIMATION_CANVAS_ID, kMin, kMax);
     });
     stopButton.addEventListener('click', () => { window.stop_animation(); });
     backwardButton.addEventListener('click', () => { window.decrease_animation_speed(); });

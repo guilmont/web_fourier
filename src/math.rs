@@ -3,37 +3,28 @@ use num_complex::Complex32;
 
 pub struct Fourier {
     original: Vec<f32>,
-    filtered: Vec<f32>,
-    transform: Vec<Complex32>,
-    cutoff: usize,
+    transform: Vec<Complex32>, // DFT coefficients for all frequencies (0..=N/2)
     coeff: f32,
 }
 
 impl Fourier {
-    /// Creates a new `Fourier` instance with the given data and cutoff frequency.
+    /// Creates a new `Fourier` instance with the given data.
     ///
     /// # Arguments
     /// * `original` - A vector of input data.
-    /// * `cutoff` - The maximum frequency to include in the Fourier series.
     ///
     /// # Returns
     /// A `Result` containing the `Fourier` instance or an error message.
-    pub fn new(original: Vec<f32>, cutoff: usize) -> Result<Self, String> {
+    pub fn new(original: Vec<f32>) -> Result<Self, String> {
         let total_size = original.len();
         if total_size == 0 {
             return Err("Input vector is empty".to_string());
         }
-
-        let max_cutoff = total_size - 50;
-        if cutoff == 0 || cutoff > max_cutoff {
-            return Err(format!("Cutoff frequency must be between 1 and {}", max_cutoff));
-        }
-
         let coeff = 2.0 * std::f32::consts::PI / (total_size as f32);
-
-        // Compute DFT coefficients for frequencies 1 to cutoff
-        let mut transform = vec![Complex32::new(0.0, 0.0); cutoff + 1];
-        for k in 1..=cutoff {
+        // Compute DFT coefficients for frequencies 0 to N/2
+        let max_k = total_size / 2;
+        let mut transform = vec![Complex32::new(0.0, 0.0); max_k + 1];
+        for k in 0..=max_k {
             let mut sum = Complex32::new(0.0, 0.0);
             for (i, &val) in original.iter().enumerate() {
                 if !val.is_finite() {
@@ -45,23 +36,34 @@ impl Fourier {
             }
             transform[k] = sum / (total_size as f32);
         }
-
-        // Reconstruct signal using only low frequencies
-        let mut filtered = vec![0.0; total_size];
-        let mean = original.iter().sum::<f32>() / (total_size as f32);
-        for i in 0..total_size {
-            filtered[i] = mean;
-            for k in 1..=cutoff {
-                let angle = coeff * (i as f32) * (k as f32);
-                let exp_term = Complex32::new(0.0, angle).exp();
-                let product = transform[k] * exp_term;
-                filtered[i] += 2.0 * product.re;
-            }
-        }
-        Ok(Fourier { original, filtered, transform, cutoff, coeff })
+        Ok(Fourier { original, transform, coeff })
     }
 
-    /// Get low pass signal strength for specific frequency and time step.
+    /// Reconstruct a filtered signal using only frequencies in the given range [k_min, k_max] (inclusive).
+    pub fn filtered_range(&self, k_min: usize, k_max: usize) -> Result<Vec<f32>, String> {
+        let n = self.original.len();
+        let max_k = self.transform.len() - 1;
+        if k_min > k_max || k_max > max_k {
+            return Err(format!("Frequency range [{}, {}] out of bounds (max {})", k_min, k_max, max_k));
+        }
+        let mut filtered = vec![0.0; n];
+        for i in 0..n {
+            for k in k_min..=k_max {
+                let angle = self.coeff * (i as f32) * (k as f32);
+                let exp_term = Complex32::new(0.0, angle).exp();
+                let product = self.transform[k] * exp_term;
+                filtered[i] += if k == 0 { product.re } else { 2.0 * product.re };
+            }
+        }
+        Ok(filtered)
+    }
+
+    /// Return the power spectrum (magnitude squared) for all N/2+1 frequencies.
+    pub fn power_spectrum(&self) -> Vec<f32> {
+        self.transform.iter().map(|c| c.norm_sqr()).collect()
+    }
+
+    /// Get the signal component for a specific frequency and time step.
     ///
     /// # Arguments
     /// * `frequency` - The frequency index.
@@ -70,19 +72,18 @@ impl Fourier {
     /// # Returns
     /// A `Result` containing the signal strength or an error message.
     pub fn get_component(&self, frequency: usize, time_step: usize) -> Result<f32, String> {
-        if frequency > self.cutoff {
-            return Err(format!("Frequency {} out of bounds (max {})", frequency, self.cutoff));
+        let max_k = self.transform.len() - 1;
+        if frequency > max_k {
+            return Err(format!("Frequency {} out of bounds (max {})", frequency, max_k));
         }
-
         let angle = self.coeff * (time_step as f32) * (frequency as f32);
         let exp_term = Complex32::new(0.0, angle).exp();
         let component = self.transform[frequency] * exp_term;
-        Ok(2.0 * component.re)
+        Ok(if frequency == 0 { component.re } else { 2.0 * component.re })
     }
 
     /// Getters
     pub fn original(&self) -> &[f32] { &self.original }
-    pub fn filtered(&self) -> &[f32] { &self.filtered }
-    pub fn cutoff(&self) -> usize { self.cutoff }
     pub fn size(&self) -> usize { self.original.len() }
+    pub fn max_frequency(&self) -> usize { self.transform.len() - 1 }
 }
