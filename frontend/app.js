@@ -3,40 +3,16 @@
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 400;
 const SPECTRUM_CANVAS_HEIGHT = 200;
-const STEP_CANVAS_ID = 1;
-const ANIMATION_CANVAS_ID = 2;
-const POWER_SPECTRUM_CANVAS_ID = 3;
-let canvasRegistry = new Map();
-let wasmMemory;
-function createAnimationImports() {
-    return {
-        start_animation_loop: (canvasId) => {
-            const canvasInfo = getCanvasInfo(canvasId);
-            if (canvasInfo.animationId !== null)
-                return; // Already running
-            function animationFrame() {
-                window.step_animation();
-                canvasInfo.animationId = requestAnimationFrame(animationFrame);
-            }
-            canvasInfo.animationId = requestAnimationFrame(animationFrame);
-        },
-        stop_animation_loop: (canvasId) => {
-            const canvasInfo = getCanvasInfo(canvasId);
-            if (canvasInfo.animationId !== null) {
-                cancelAnimationFrame(canvasInfo.animationId);
-                canvasInfo.animationId = null;
-            }
-        },
-    };
-}
+let WASM;
+let CANVAS_REGISTRY = new Map();
 // Helper function to decode WASM strings
 function decodeWasmString(ptr, len) {
-    const bytes = new Uint8Array(wasmMemory.buffer, ptr, len);
+    const bytes = new Uint8Array(WASM.memory.buffer, ptr, len);
     return new TextDecoder("utf-8").decode(bytes);
 }
 // Helper function to get canvas and context by integer ID
 function getCanvasInfo(canvasId) {
-    const canvasInfo = canvasRegistry.get(canvasId);
+    const canvasInfo = CANVAS_REGISTRY.get(canvasId);
     if (!canvasInfo) {
         throw new Error(`Canvas with id ${canvasId} not found`);
     }
@@ -91,37 +67,54 @@ function createCanvasImports() {
             getCanvasInfo(canvasId).context.fillText(text, x, y);
         },
         set_font: (canvasId, fontPtr, fontLen) => {
-            const font = decodeWasmString(fontPtr, fontLen);
-            getCanvasInfo(canvasId).context.font = font;
+            getCanvasInfo(canvasId).context.font = decodeWasmString(fontPtr, fontLen);
         },
         set_text_align: (canvasId, alignPtr, alignLen) => {
-            const align = decodeWasmString(alignPtr, alignLen);
-            getCanvasInfo(canvasId).context.textAlign = align;
+            getCanvasInfo(canvasId).context.textAlign = decodeWasmString(alignPtr, alignLen);
+        },
+        measure_text_width: (canvasId, textPtr, textLen, fontPtr, fontLen) => {
+            const text = decodeWasmString(textPtr, textLen);
+            const font = decodeWasmString(fontPtr, fontLen);
+            const ctx = getCanvasInfo(canvasId).context;
+            ctx.save();
+            ctx.font = font;
+            const width = ctx.measureText(text).width;
+            ctx.restore();
+            return width;
         },
     };
 }
 function createConsoleImports() {
     return {
-        log: (ptr, len) => {
-            const bytes = new Uint8Array(wasmMemory.buffer, ptr, len);
-            const msg = new TextDecoder("utf-8").decode(bytes);
-            console.log("[WASM]", msg);
-        },
-        error: (ptr, len) => {
-            const bytes = new Uint8Array(wasmMemory.buffer, ptr, len);
-            const msg = new TextDecoder("utf-8").decode(bytes);
-            console.error("[WASM]", msg);
-        }
+        log: (ptr, len) => { console.log("[WASM]", decodeWasmString(ptr, len)); },
+        error: (ptr, len) => { console.error("[WASM]", decodeWasmString(ptr, len)); },
     };
 }
 function createBrowserImports() {
     return {
-        alert: (ptr, len) => {
-            const bytes = new Uint8Array(wasmMemory.buffer, ptr, len);
-            const msg = new TextDecoder("utf-8").decode(bytes);
-            window.alert(msg);
-        },
+        alert: (ptr, len) => { window.alert(decodeWasmString(ptr, len)); },
         time_now: () => performance.now(),
+    };
+}
+function createAnimationImports() {
+    return {
+        start_animation_loop: (canvasId) => {
+            const canvasInfo = getCanvasInfo(canvasId);
+            if (canvasInfo.animationId !== null)
+                return; // Already running
+            function animationFrame() {
+                WASM.step_animation();
+                canvasInfo.animationId = requestAnimationFrame(animationFrame);
+            }
+            canvasInfo.animationId = requestAnimationFrame(animationFrame);
+        },
+        stop_animation_loop: (canvasId) => {
+            const canvasInfo = getCanvasInfo(canvasId);
+            if (canvasInfo.animationId !== null) {
+                cancelAnimationFrame(canvasInfo.animationId);
+                canvasInfo.animationId = null;
+            }
+        },
     };
 }
 async function loadWasm() {
@@ -132,16 +125,7 @@ async function loadWasm() {
             Canvas: createCanvasImports(),
             Console: createConsoleImports(),
         });
-        const expo = wasmModule.instance.exports;
-        wasmMemory = expo.memory;
-        window.plot_example = expo.plot_example;
-        window.plot_power_spectrum = expo.plot_power_spectrum;
-        // New self-contained Rust animation functions
-        window.step_animation = expo.step_animation;
-        window.play_pause_animation = expo.play_pause_animation;
-        window.stop_animation = expo.stop_animation;
-        window.increase_animation_speed = expo.increase_animation_speed;
-        window.decrease_animation_speed = expo.decrease_animation_speed;
+        WASM = wasmModule.instance.exports;
         console.log("WebAssembly loaded successfully!");
     }
     catch (error) {
@@ -154,35 +138,43 @@ function registerCanvas(canvasName, canvasId, width, height) {
     const context = canvas.getContext('2d');
     canvas.width = width;
     canvas.height = height;
-    canvasRegistry.set(canvasId, { canvas, context, animationId: null });
+    CANVAS_REGISTRY.set(canvasId, { canvas, context, animationId: null });
+    canvas.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        WASM.canvas_mouse_move(canvasId, x, y);
+    });
 }
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', async () => {
-    // Set up the canvases
-    registerCanvas('step-canvas', STEP_CANVAS_ID, CANVAS_WIDTH, CANVAS_HEIGHT);
-    registerCanvas('animation-canvas', ANIMATION_CANVAS_ID, CANVAS_WIDTH, CANVAS_HEIGHT);
-    registerCanvas('power-spectrum-canvas', POWER_SPECTRUM_CANVAS_ID, CANVAS_WIDTH, SPECTRUM_CANVAS_HEIGHT);
     // Load the WebAssembly module
     await loadWasm();
+    // Set up the canvases
+    const EXAMPLE_CANVAS_ID = WASM.get_example_canvas_id();
+    const SPECTRUM_CANVAS_ID = WASM.get_spectrum_canvas_id();
+    const ANIMATION_CANVAS_ID = WASM.get_animation_canvas_id();
+    registerCanvas('step-canvas', EXAMPLE_CANVAS_ID, CANVAS_WIDTH, CANVAS_HEIGHT);
+    registerCanvas('animation-canvas', ANIMATION_CANVAS_ID, CANVAS_WIDTH, CANVAS_HEIGHT);
+    registerCanvas('power-spectrum-canvas', SPECTRUM_CANVAS_ID, CANVAS_WIDTH, SPECTRUM_CANVAS_HEIGHT);
     // Add event listeners for buttons
     const playPauseButton = document.getElementById('play-pause');
     const stopButton = document.getElementById('stop');
     const backwardButton = document.getElementById('backward');
     const forwardButton = document.getElementById('forward');
-    const stepCutoffInput = document.getElementById('step-cutoff');
-    const stepFreqMinInput = document.getElementById('step-freq-min');
-    const animationCutoffInput = document.getElementById('animation-cutoff');
+    const exampleFreqMinInput = document.getElementById('example-freq-min');
+    const exampleMaxFreqInput = document.getElementById('example-freq-max');
     const animationFreqMinInput = document.getElementById('animation-freq-min');
+    const animationFreqMaxInput = document.getElementById('animation-freq-max');
     // Track current example
     let currentExample = 0; // 0=step, 1=sine, 2=square, 3=triangle
     function plotCurrentExample() {
-        const kMin = parseInt(stepFreqMinInput.value, 10);
-        const kMax = parseInt(stepCutoffInput.value, 10);
-        window.plot_example(STEP_CANVAS_ID, kMin, kMax, currentExample);
-        window.plot_power_spectrum(POWER_SPECTRUM_CANVAS_ID, currentExample);
+        const kMin = parseInt(exampleFreqMinInput.value, 10);
+        const kMax = parseInt(exampleMaxFreqInput.value, 10);
+        WASM.plot_example(kMin, kMax, currentExample);
     }
-    stepCutoffInput.addEventListener('change', plotCurrentExample);
-    stepFreqMinInput.addEventListener('change', plotCurrentExample);
+    exampleMaxFreqInput.addEventListener('change', plotCurrentExample);
+    exampleFreqMinInput.addEventListener('change', plotCurrentExample);
     // Example buttons
     document.querySelectorAll('.example-btn').forEach((btn, idx) => {
         btn.addEventListener('click', (e) => {
@@ -197,16 +189,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         stopButton.click();
         playPauseButton.click();
     }
-    animationCutoffInput.addEventListener('change', restartAnimation);
+    animationFreqMaxInput.addEventListener('change', restartAnimation);
     animationFreqMinInput.addEventListener('change', restartAnimation);
     playPauseButton.addEventListener('click', () => {
         const kMin = parseInt(animationFreqMinInput.value, 10);
-        const kMax = parseInt(animationCutoffInput.value, 10);
-        window.play_pause_animation(ANIMATION_CANVAS_ID, kMin, kMax);
+        const kMax = parseInt(animationFreqMaxInput.value, 10);
+        WASM.play_pause_animation(ANIMATION_CANVAS_ID, kMin, kMax);
     });
-    stopButton.addEventListener('click', () => { window.stop_animation(); });
-    backwardButton.addEventListener('click', () => { window.decrease_animation_speed(); });
-    forwardButton.addEventListener('click', () => { window.increase_animation_speed(); });
+    stopButton.addEventListener('click', () => { WASM.stop_animation(); });
+    backwardButton.addEventListener('click', () => { WASM.decrease_animation_speed(); });
+    forwardButton.addEventListener('click', () => { WASM.increase_animation_speed(); });
     // Initial plot and highlight
     document.querySelector('.example-btn[data-example="step"]')?.classList.add('active');
     plotCurrentExample();

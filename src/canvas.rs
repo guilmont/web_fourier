@@ -48,6 +48,7 @@ mod js {
         pub fn fill_text(canvas_id: u32, text_ptr: *const u8, text_len: usize, x: f32, y: f32);
         pub fn set_font(canvas_id: u32, font_ptr: *const u8, font_len: usize);
         pub fn set_text_align(canvas_id: u32, align_ptr: *const u8, align_len: usize);
+        pub fn measure_text_width(canvas_id: u32, text_ptr: *const u8, text_len: usize, font_ptr: *const u8, font_len: usize) -> f32;
     }
 }
 
@@ -69,6 +70,11 @@ impl Canvas {
 
     /// Get canvas height
     pub fn height(&self) -> f32 { unsafe { js::height(self.id) } }
+
+    /// Measures the width of a given text with a specified font.
+    pub fn measure_text_width(&self, text: &str, font: &str) -> f32 {
+        unsafe { js::measure_text_width(self.id, text.as_ptr(), text.len(), font.as_ptr(), font.len()) }
+    }
 
     /// Begin a new path for drawing
     pub fn begin_path(&self) { unsafe { js::begin_path(self.id) } }

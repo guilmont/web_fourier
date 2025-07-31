@@ -26,11 +26,22 @@ impl Plotter {
         let canvas_width = canvas.width();
         let canvas_height = canvas.height();
 
+        let viewport = Viewport {
+            x_min: 0.0,
+            x_max: 1.0,
+            y_min: 0.0,
+            y_max: 1.0,
+            x_auto: true,
+            y_auto: true,
+            preserve_aspect_ratio: false,
+        };
+
+        // Initialize viewport to full canvas size
         Self {
             canvas,
             canvas_width,
             canvas_height,
-            viewport: Viewport { x_min: 0.0, x_max: 1.0, y_min: 0.0, y_max: 1.0, x_auto: true, y_auto: true },
+            viewport,
             x_ticks: 10,
             y_ticks: 10,
             font_size: 12.0,
@@ -61,6 +72,9 @@ impl Plotter {
     pub fn set_font_size(&mut self, size: f32) { self.font_size = size; }
     /// Hide the axes
     pub fn hide_axes(&mut self) { self.hide_axes = true; }
+    /// Set preserve aspect ratio when drawing
+    /// This is useful for ensuring that circles appear as circles, etc.
+    pub fn preserve_aspect_ratio(&mut self, preserve: bool) { self.viewport.preserve_aspect_ratio = preserve; }
 
     /// Plot a single function as a line
     pub fn plot_line(&mut self, x_data: &[f32], y_data: &[f32], color: (u8, u8, u8), line_width: f32) -> Result<(), String> {
@@ -128,6 +142,24 @@ impl Plotter {
             self.set_y_range(y_min - 0.1 * range, y_max + 0.1 * range);
         }
 
+        // Adjust viewport for aspect ratio if needed
+        if self.viewport.preserve_aspect_ratio {
+            let x_range = self.viewport.x_max - self.viewport.x_min;
+            let y_range = self.viewport.y_max - self.viewport.y_min;
+            let aspect_ratio = self.canvas_width / self.canvas_height;
+            if x_range / y_range > aspect_ratio {
+                // X range is too wide, adjust Y range
+                let new_y_range = x_range / aspect_ratio;
+                let y_center = (self.viewport.y_max + self.viewport.y_min) / 2.0;
+                self.set_y_range(y_center - new_y_range / 2.0, y_center + new_y_range / 2.0);
+            } else {
+                // Y range is too wide, adjust X range
+                let new_x_range = y_range * aspect_ratio;
+                let x_center = (self.viewport.x_max + self.viewport.x_min) / 2.0;
+                self.set_x_range(x_center - new_x_range / 2.0, x_center + new_x_range / 2.0);
+            }
+        }
+
         self.canvas.clear();
         if !self.hide_axes {
             self.draw_grid();
@@ -173,6 +205,30 @@ impl Plotter {
                 }
             }
         }
+    }
+
+    /// Display a text box with coordinates (in plotter space) at the top right of the plot.
+    pub fn show_coordinates(&self, x: f32, y: f32) {
+        // Format coordinates in plotter (math) space
+        let vp = &self.viewport;
+        let x_pos = vp.x_min + (x / self.canvas.width()) * (vp.x_max - vp.x_min);
+        let y_pos = vp.y_max - (y / self.canvas.height()) * (vp.y_max - vp.y_min);
+
+        // Text measurement
+        let text = format!("({:.2}, {:.2})", x_pos, y_pos);
+        let font = format!("{}px monospace", self.font_size);
+        let width = self.canvas.measure_text_width(&text, &font) * 1.5; // More padding
+        let height = self.font_size * 1.7; // More padding
+        let margin = self.font_size * 0.5;
+
+        // Top right in canvas pixel coordinates
+        let x_px = self.canvas_width - margin;
+        let y_px = self.font_size + margin;
+        self.canvas.clear_rect(x_px - width, 0.0, width + margin, height + margin * 0.5);
+        self.canvas.set_fill_color(crate::canvas::BLACK.0, crate::canvas::BLACK.1, crate::canvas::BLACK.2, 1.0);
+        self.canvas.set_text_align("right");
+        self.canvas.set_font(&font);
+        self.canvas.fill_text(&text, x_px, y_px);
     }
 
     /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -317,16 +373,14 @@ struct FunctionData {
     bar_width: f32,
 }
 
-struct Viewport {
+#[derive(Debug)]
+pub struct Viewport {
     /// X-axis range
-    x_min: f32,
-    x_max: f32,
-    // automatically calculated based on data
-    x_auto: bool,
-
-    /// Y-axis range
-    y_min: f32,
-    y_max: f32,
-    // automatically calculated based on data
-    y_auto: bool,
+    pub x_min: f32,
+    pub x_max: f32,
+    pub x_auto: bool,
+    pub y_min: f32,
+    pub y_max: f32,
+    pub y_auto: bool,
+    pub preserve_aspect_ratio: bool,
 }

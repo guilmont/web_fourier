@@ -11,8 +11,7 @@ mod js {
 }
 
 // Define constants for magic numbers
-const X_RANGE: (f32, f32) = (-12.0, 12.0);
-const Y_RANGE: (f32, f32) = (-12.0, 12.0);
+const Y_RANGE: (f32, f32) = (-10.0, 10.0);
 const LINE_WIDTH_ORIGINAL: f32 = 1.0;
 const LINE_WIDTH_RECONSTRUCTED: f32 = 2.0;
 const ARROW_WIDTH: f32 = 2.0;
@@ -126,7 +125,7 @@ impl Fourier {
     /// Configures and returns a new plotter instance with predefined ranges.
     fn setup_plotter_from_canvas(canvas: &canvas::Canvas) -> plotter::Plotter {
         let mut plt = plotter::Plotter::new(canvas.id());
-        plt.set_x_range(X_RANGE.0, X_RANGE.1);
+        plt.preserve_aspect_ratio(true);
         plt.set_y_range(Y_RANGE.0, Y_RANGE.1);
         plt
     }

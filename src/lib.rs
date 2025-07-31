@@ -1,9 +1,40 @@
+use std::collections::HashMap;
+use std::cell::RefCell;
+
 mod canvas;
 mod math;
 mod console;
 mod plotter;
 mod browser;
 mod animation;
+
+
+const EXAMPLE_CANVAS_ID: u32 = 1;
+const SPECTRUM_CANVAS_ID: u32 = 2;
+const ANIMATION_CANVAS_ID: u32 = 3;
+
+#[no_mangle] pub fn get_example_canvas_id() -> u32 { EXAMPLE_CANVAS_ID }
+#[no_mangle] pub fn get_spectrum_canvas_id() -> u32 { SPECTRUM_CANVAS_ID }
+#[no_mangle] pub fn get_animation_canvas_id() -> u32 { ANIMATION_CANVAS_ID }
+
+struct ExampleCache {
+    kind: u32,
+    t: Vec<f32>,
+    fourier: math::Fourier,
+}
+
+thread_local! {
+    // Global registry for Plotter instances by canvas_id (WASM: single-threaded, so RefCell is fine)
+    static PLOTTER_REGISTRY: RefCell<HashMap<u32, plotter::Plotter>> = RefCell::new(HashMap::new());
+    // Cache for example data, shared across the application
+    static EXAMPLE_CACHE: RefCell<Option<ExampleCache>> = RefCell::new(None);
+    // Animation instance for the Fourier series visualization
+    static ANIMATION: RefCell<Option<animation::Fourier>> = RefCell::new(None);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/// Example data
+///////////////////////////////////////////////////////////////////////////////
 
 fn get_example_data(kind: u32) -> (Vec<f32>, Vec<f32>) {
     const TOTAL_NUM_POINTS: usize = 500;
@@ -38,20 +69,6 @@ fn get_example_data(kind: u32) -> (Vec<f32>, Vec<f32>) {
     (t,x)
 }
 
-
-struct ExampleCache {
-    kind: u32,
-    t: Vec<f32>,
-    fourier: math::Fourier,
-}
-static mut EXAMPLE_CACHE: Option<ExampleCache> = None;
-
-fn clamp_frequency_range(k_min: usize, k_max: usize, max_k: usize) -> (usize, usize) {
-    let k_min = if k_min > max_k { max_k } else { k_min };
-    let k_max = if k_max > max_k { max_k } else { k_max };
-    (k_min, k_max)
-}
-
 fn generate_cache(kind: u32) -> ExampleCache {
     let (t, x) = get_example_data(kind);
     let fourier = match math::Fourier::new(x) {
@@ -64,76 +81,75 @@ fn generate_cache(kind: u32) -> ExampleCache {
     ExampleCache { kind, t, fourier }
 }
 
-fn plot_cached_example(canvas_id: u32, k_min: usize, k_max: usize, cache: &ExampleCache) {
-    let mut plt = plotter::Plotter::new(canvas_id);
-    if let Err(msg) = plt.plot_line(&cache.t, cache.fourier.original(), canvas::TAB_BLUE, 2.0) {
-        console::error(&format!("Error plotting function: {}", msg));
-        return;
-    }
-    let max_k = cache.fourier.max_frequency();
-    let (k_min, k_max) = clamp_frequency_range(k_min, k_max, max_k);
+fn plot_cached_example(k_min: usize, k_max: usize, cache: &mut ExampleCache) {
+    // Start with the example plotter
+    let mut plt = plotter::Plotter::new(EXAMPLE_CANVAS_ID);
     let filtered = match cache.fourier.filtered_range(k_min, k_max) {
         Ok(vec) => vec,
         Err(msg) => { console::error(&format!("Error filtering: {}", msg)); return; }
     };
+
+    if let Err(msg) = plt.plot_line(&cache.t, cache.fourier.original(), canvas::TAB_BLUE, 2.0) {
+        console::error(&format!("Error plotting function: {}", msg));
+        return;
+    }
     if let Err(msg) = plt.plot_line(&cache.t, &filtered, canvas::TAB_ORANGE, 2.0) {
         console::error(&format!("Error plotting filtered: {}", msg));
         return;
     }
     plt.show();
+    // Store the plotter in the registry for mouse move coordinate display
+    PLOTTER_REGISTRY.with(|reg| { reg.borrow_mut().insert(EXAMPLE_CANVAS_ID, plt); });
 }
 
-fn plot_cached_power_spectrum(canvas_id: u32, cache: &ExampleCache) {
+fn plot_cached_spectrum(cache: &mut ExampleCache) {
+    // Now plot the Fourier spectrum
     let power = cache.fourier.power_spectrum();
     let n = power.len();
     let freq: Vec<f32> = (0..n).map(|k| k as f32).collect();
 
-
-    let mut plt = plotter::Plotter::new(canvas_id);
-    plt.set_x_range(-4.0, 50.0);
-    let bar_width = 1.0;
-    if let Err(msg) = plt.plot_histogram(&freq, &power, canvas::TAB_GREEN, bar_width) {
+    let mut plt = plotter::Plotter::new(SPECTRUM_CANVAS_ID);
+    plt.set_x_range(-5.0, 50.0);
+    if let Err(msg) = plt.plot_histogram(&freq, &power, canvas::TAB_GREEN, 1.0) {
         console::error(&format!("Error plotting power spectrum: {}", msg));
         return;
     }
     plt.show();
-}
-
-/// Plot the power spectrum of the cached example to a canvas
-#[no_mangle]
-pub unsafe fn plot_power_spectrum(canvas_id: u32, kind: u32) {
-    if let Some(ref cache) = EXAMPLE_CACHE {
-        if cache.kind == kind {
-            plot_cached_power_spectrum(canvas_id, &cache);
-            return;
-        }
-    }
-    let cache = generate_cache(kind);
-    plot_cached_power_spectrum(canvas_id, &cache);
-    EXAMPLE_CACHE = Some(cache);
+    // Store the plotter in the registry for mouse move coordinate display
+    PLOTTER_REGISTRY.with(|reg| { reg.borrow_mut().insert(SPECTRUM_CANVAS_ID, plt); });
 }
 
 #[no_mangle]
-pub unsafe fn plot_example(canvas_id: u32, k_min: usize, k_max: usize, kind: u32) {
-    if let Some(ref cache) = EXAMPLE_CACHE {
-        if cache.kind == kind {
-            plot_cached_example(canvas_id, k_min, k_max, &cache);
-            return;
+pub fn plot_example(k_min: usize, k_max: usize, kind: u32) {
+    let mut cache_kind_match = false;
+    EXAMPLE_CACHE.with(|cell| {
+        if let Some(ref mut cache) = *cell.borrow_mut() {
+            if cache.kind == kind {
+                plot_cached_example(k_min, k_max, cache);
+                cache_kind_match = true;
+            }
         }
-    }
+    });
+    if cache_kind_match { return; }
 
-    let cache = generate_cache(kind);
-    plot_cached_example(canvas_id, k_min, k_max, &cache);
-    EXAMPLE_CACHE = Some(cache);
+    let mut cache = generate_cache(kind);
+    plot_cached_example(k_min, k_max, &mut cache);
+    plot_cached_spectrum(&mut cache);
+    EXAMPLE_CACHE.with(|cell| { *cell.borrow_mut() = Some(cache); });
 }
 
 
-///////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
+/// Display mouse coordinates using Plotter, converting from canvas to plotter coordinates.
+/// Display mouse coordinates using the current Plotter instance for the canvas, if available.
+#[no_mangle]
+pub fn canvas_mouse_move(canvas_id: u32, x: f32, y: f32) {
+    PLOTTER_REGISTRY.with(|reg| {
+        if let Some(plt) = reg.borrow().get(&canvas_id) { plt.show_coordinates(x, y); }
+    });
+}
 
-// Static animation instance for WASM interface
-/// Start an animation loop for a 2D Fourier series visualization
-static mut ANIMATION: Option<animation::Fourier> = None;
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 
 fn gen_cyclic_function() -> (Vec<f32>, Vec<f32>) {
     const BIG_R: f32 = 5.0;
@@ -156,11 +172,11 @@ fn init_animation_on_canvas(k_min: usize, k_max: usize, canvas_id: u32) {
     match animation::Fourier::new(x, y, k_min, k_max, canvas_id) {
         Ok(mut var) => {
             var.start();
-            unsafe { ANIMATION = Some(var); }
+            ANIMATION.with(|cell| { *cell.borrow_mut() = Some(var); });
         },
         Err(msg) => {
             console::error(&format!("Failed to create Fourier animation: {}", msg));
-            unsafe { ANIMATION = None; }
+            ANIMATION.with(|cell| { *cell.borrow_mut() = None; });
         }
     }
 }
@@ -168,14 +184,18 @@ fn init_animation_on_canvas(k_min: usize, k_max: usize, canvas_id: u32) {
 
 #[no_mangle]
 pub fn step_animation() {
-    unsafe { if let Some(ref mut var) = ANIMATION { var.step(); } }
+    ANIMATION.with(|cell| {
+        if let Some(ref mut var) = *cell.borrow_mut() { var.step(); }
+    });
 }
 
 #[no_mangle]
 pub fn play_pause_animation(canvas_id: u32, k_min: usize, k_max: usize) {
-    unsafe {
-        if let Some(ref mut var) = ANIMATION {
+    ANIMATION.with(|cell| {
+        let mut borrow = cell.borrow_mut();
+        if let Some(ref mut var) = *borrow {
             if var.is_stopped() {
+                drop(borrow);
                 init_animation_on_canvas(k_min, k_max, canvas_id);
             } else if var.is_paused() {
                 var.play();
@@ -185,22 +205,35 @@ pub fn play_pause_animation(canvas_id: u32, k_min: usize, k_max: usize) {
                 var.pause();
             }
         } else {
+            drop(borrow);
             init_animation_on_canvas(k_min, k_max, canvas_id);
         }
-    }
+    });
 }
 
 #[no_mangle]
 pub fn stop_animation() {
-    unsafe { if let Some(ref mut var) = ANIMATION { var.stop(); } }
+    ANIMATION.with(|cell| {
+        if let Some(ref mut var) = *cell.borrow_mut() {
+            var.stop();
+        }
+    });
 }
 
 #[no_mangle]
 pub fn increase_animation_speed() {
-    unsafe { if let Some(ref mut var) = ANIMATION { var.set_speed(var.speed() + 0.5); } }
+    ANIMATION.with(|cell| {
+        if let Some(ref mut var) = *cell.borrow_mut() {
+            var.set_speed(var.speed() + 0.5);
+        }
+    });
 }
 
 #[no_mangle]
 pub fn decrease_animation_speed() {
-    unsafe { if let Some(ref mut var) = ANIMATION { var.set_speed(var.speed() - 0.5); } }
+    ANIMATION.with(|cell| {
+        if let Some(ref mut var) = *cell.borrow_mut() {
+            var.set_speed(var.speed() - 0.5);
+        }
+    });
 }

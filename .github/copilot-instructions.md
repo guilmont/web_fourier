@@ -23,7 +23,7 @@
   - Use `snake_case` for functions/variables, `CamelCase` for types/structs.
   - Prefer explicit types and error handling with `Result`/`Option`.
   - Organize code into modules by feature.
-- **TypeScript/JS:**
+- **TypeScript:**
   - Use `camelCase` for variables/functions, `PascalCase` for classes.
   - Prefer ES6 imports and explicit types.
   - Use semicolons and 2-space indentation.
