@@ -1,6 +1,7 @@
 declare global {
     interface Window {
         plot_example: any;
+        plot_power_spectrum: any;
         step_animation: any;
         play_pause_animation: any;
         stop_animation: any;

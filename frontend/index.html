@@ -16,11 +16,13 @@
                 <button class="example-btn" data-example="sine">Sine</button>
                 <button class="example-btn" data-example="square">Square</button>
                 <button class="example-btn" data-example="triangle">Triangle</button>
-            </div>
-            <div>
                 <b>Frequency range:</b>
                 <label>From <input type="number" id="step-freq-min" value="0" min="0" max="100" style="width:4em"></label>
                 <label>to <input type="number" id="step-cutoff" value="8" min="1" max="100" style="width:4em"></label>
+            </div>
+            <div style="margin-top:2em">
+                <canvas id="power-spectrum-canvas" width="800" height="200"></canvas>
+                <b>Power Spectrum</b>
             </div>
         </div>
 

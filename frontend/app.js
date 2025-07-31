@@ -2,8 +2,10 @@
 // Define constants for canvas dimensions
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 400;
+const SPECTRUM_CANVAS_HEIGHT = 200;
 const STEP_CANVAS_ID = 1;
 const ANIMATION_CANVAS_ID = 2;
+const POWER_SPECTRUM_CANVAS_ID = 3;
 let canvasRegistry = new Map();
 let wasmMemory;
 function createAnimationImports() {
@@ -133,6 +135,7 @@ async function loadWasm() {
         const expo = wasmModule.instance.exports;
         wasmMemory = expo.memory;
         window.plot_example = expo.plot_example;
+        window.plot_power_spectrum = expo.plot_power_spectrum;
         // New self-contained Rust animation functions
         window.step_animation = expo.step_animation;
         window.play_pause_animation = expo.play_pause_animation;
@@ -158,6 +161,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Set up the canvases
     registerCanvas('step-canvas', STEP_CANVAS_ID, CANVAS_WIDTH, CANVAS_HEIGHT);
     registerCanvas('animation-canvas', ANIMATION_CANVAS_ID, CANVAS_WIDTH, CANVAS_HEIGHT);
+    registerCanvas('power-spectrum-canvas', POWER_SPECTRUM_CANVAS_ID, CANVAS_WIDTH, SPECTRUM_CANVAS_HEIGHT);
     // Load the WebAssembly module
     await loadWasm();
     // Add event listeners for buttons
@@ -175,6 +179,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const kMin = parseInt(stepFreqMinInput.value, 10);
         const kMax = parseInt(stepCutoffInput.value, 10);
         window.plot_example(STEP_CANVAS_ID, kMin, kMax, currentExample);
+        window.plot_power_spectrum(POWER_SPECTRUM_CANVAS_ID, currentExample);
     }
     stepCutoffInput.addEventListener('change', plotCurrentExample);
     stepFreqMinInput.addEventListener('change', plotCurrentExample);

@@ -25,7 +25,7 @@ impl Plotter {
         let canvas = canvas::Canvas::new(canvas_id);
         let canvas_width = canvas.width();
         let canvas_height = canvas.height();
-        
+
         Self {
             canvas,
             canvas_width,
@@ -70,17 +70,37 @@ impl Plotter {
         if x_data.len() < 2 {
             return Err("At least two data points are required to plot a line".to_string());
         }
-        self.data.push(FunctionData { style: FunctionType::LINE, x_data: x_data.to_vec(), y_data: y_data.to_vec(), color, line_width });
+        self.data.push(FunctionData { style: FunctionType::LINE, x_data: x_data.to_vec(), y_data: y_data.to_vec(), color, line_width, bar_width: 0.0 });
         Ok(())
     }
 
     pub fn plot_arrow(&mut self, x_data: &[f32], y_data: &[f32], color: (u8, u8, u8), line_width: f32) -> Result<(), String> {
         if x_data.len() == 2 && y_data.len() == 2 {
-            self.data.push(FunctionData { style: FunctionType::ARROW, x_data: x_data.to_vec(), y_data: y_data.to_vec(), color, line_width });
+            self.data.push(FunctionData { style: FunctionType::ARROW, x_data: x_data.to_vec(), y_data: y_data.to_vec(), color, line_width, bar_width: 0.0 });
             Ok(())
         } else {
             Err("x_data and y_data must have exactly two points for arrows".to_string())
         }
+    }
+
+    /// Plot a histogram (bar plot) given x (bin centers) and y (heights)
+    pub fn plot_histogram(&mut self, x_data: &[f32], y_data: &[f32], color: (u8, u8, u8), bar_width: f32) -> Result<(), String> {
+        if x_data.len() != y_data.len() {
+            return Err("x_data and y_data must have the same length".to_string());
+        }
+        if x_data.len() < 1 {
+            return Err("At least one data point is required to plot a histogram".to_string());
+        }
+        self.data.push(FunctionData {
+            style: FunctionType::HISTOGRAM,
+            x_data: x_data.to_vec(),
+            y_data: y_data.to_vec(),
+            color,
+            line_width: 1.0,
+            bar_width
+        });
+
+        Ok(())
     }
 
     /// Plot multiple functions on the same canvas with different colors
@@ -134,6 +154,22 @@ impl Plotter {
                     let start_x = self.transform_point(func.x_data[0], func.y_data[0]);
                     let end_x = self.transform_point(func.x_data[1], func.y_data[1]);
                     self.canvas.draw_arrow(start_x.0, start_x.1, end_x.0, end_x.1, func.color, func.line_width);
+                },
+                FunctionType::HISTOGRAM => {
+                    // For each bin, draw a vertical bar centered at x_data[i] with height y_data[i]
+                    let x_data = &func.x_data;
+                    let y_data = &func.y_data;
+                    let color = &func.color;
+                    let bar_width = func.bar_width;
+                    self.canvas.set_fill_color(color.0, color.1, color.2, 0.8);
+                    self.canvas.set_line_width(func.line_width);
+
+                    for i in 0..x_data.len() {
+                        // Calculate left and right edges of the bar
+                        let (x0, y0) = self.transform_point(x_data[i], 0.0);
+                        let (x1, y1) = self.transform_point(x_data[i] + bar_width, y_data[i]);
+                        self.canvas.fill_rect(x0, y0, x1-x0, y1 - y0);
+                    }
                 }
             }
         }
@@ -217,7 +253,7 @@ impl Plotter {
                 if x_val.abs() < 0.001 {
                     self.canvas.fill_text("0", x_pixel, y_axis + self.font_size + 5.0);
                 } else {
-                    self.canvas.fill_text(&format!("{:.1}", x_val), x_pixel, y_axis + self.font_size + 5.0);
+                    self.canvas.fill_text(&format!("{:.2}", x_val), x_pixel, y_axis + self.font_size + 5.0);
                 }
             }
         }
@@ -254,7 +290,7 @@ impl Plotter {
                 self.canvas.stroke();
 
                 // Draw label
-                self.canvas.fill_text(&format!("{:.1}", y_val), x_axis - 10.0, y_pixel + self.font_size / 3.0);
+                self.canvas.fill_text(&format!("{:.2}", y_val), x_axis - 10.0, y_pixel + self.font_size / 3.0);
             }
         }
     }
@@ -264,6 +300,7 @@ impl Plotter {
 enum FunctionType {
     LINE,
     ARROW,
+    HISTOGRAM,
 }
 
 /// Data structure for a single function to plot
@@ -276,6 +313,8 @@ struct FunctionData {
     color: (u8, u8, u8),
     /// Line width for the function
     line_width: f32,
+    /// Histogram bar width (used for histogram style)
+    bar_width: f32,
 }
 
 struct Viewport {

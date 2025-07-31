@@ -52,6 +52,18 @@ fn clamp_frequency_range(k_min: usize, k_max: usize, max_k: usize) -> (usize, us
     (k_min, k_max)
 }
 
+fn generate_cache(kind: u32) -> ExampleCache {
+    let (t, x) = get_example_data(kind);
+    let fourier = match math::Fourier::new(x) {
+        Ok(fourier) => fourier,
+        Err(msg) => {
+            console::error(&format!("Failed to create Fourier instance: {}", msg));
+            panic!("Fourier creation failed");
+        }
+    };
+    ExampleCache { kind, t, fourier }
+}
+
 fn plot_cached_example(canvas_id: u32, k_min: usize, k_max: usize, cache: &ExampleCache) {
     let mut plt = plotter::Plotter::new(canvas_id);
     if let Err(msg) = plt.plot_line(&cache.t, cache.fourier.original(), canvas::TAB_BLUE, 2.0) {
@@ -71,6 +83,36 @@ fn plot_cached_example(canvas_id: u32, k_min: usize, k_max: usize, cache: &Examp
     plt.show();
 }
 
+fn plot_cached_power_spectrum(canvas_id: u32, cache: &ExampleCache) {
+    let power = cache.fourier.power_spectrum();
+    let n = power.len();
+    let freq: Vec<f32> = (0..n).map(|k| k as f32).collect();
+
+
+    let mut plt = plotter::Plotter::new(canvas_id);
+    plt.set_x_range(-4.0, 50.0);
+    let bar_width = 1.0;
+    if let Err(msg) = plt.plot_histogram(&freq, &power, canvas::TAB_GREEN, bar_width) {
+        console::error(&format!("Error plotting power spectrum: {}", msg));
+        return;
+    }
+    plt.show();
+}
+
+/// Plot the power spectrum of the cached example to a canvas
+#[no_mangle]
+pub unsafe fn plot_power_spectrum(canvas_id: u32, kind: u32) {
+    if let Some(ref cache) = EXAMPLE_CACHE {
+        if cache.kind == kind {
+            plot_cached_power_spectrum(canvas_id, &cache);
+            return;
+        }
+    }
+    let cache = generate_cache(kind);
+    plot_cached_power_spectrum(canvas_id, &cache);
+    EXAMPLE_CACHE = Some(cache);
+}
+
 #[no_mangle]
 pub unsafe fn plot_example(canvas_id: u32, k_min: usize, k_max: usize, kind: u32) {
     if let Some(ref cache) = EXAMPLE_CACHE {
@@ -80,17 +122,7 @@ pub unsafe fn plot_example(canvas_id: u32, k_min: usize, k_max: usize, kind: u32
         }
     }
 
-    // If no cache or different kind, generate new cache
-    let (t, x) = get_example_data(kind);
-    let fourier = match math::Fourier::new(x) {
-        Ok(fourier) => fourier,
-        Err(msg) => {
-            console::error(&format!("Failed to create Fourier instance: {}", msg));
-            return;
-        }
-    };
-
-    let cache = ExampleCache { kind, t, fourier };
+    let cache = generate_cache(kind);
     plot_cached_example(canvas_id, k_min, k_max, &cache);
     EXAMPLE_CACHE = Some(cache);
 }
