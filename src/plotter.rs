@@ -1,12 +1,14 @@
 #![allow(dead_code)]
 
 use crate::canvas;
+use crate::canvas::Canvas;
+
+use web_canvas::console;
+
 
 /// Mathematical canvas plotting engine with customizable viewport
 pub struct Plotter {
-    canvas: canvas::Canvas,
-    canvas_width: f32,
-    canvas_height: f32,
+    canvas: Canvas, // Own the `Canvas` object instead of borrowing it
 
     viewport: Viewport,
     x_ticks: u32,
@@ -21,27 +23,20 @@ pub struct Plotter {
 
 impl Plotter {
     /// Create a new plotting canvas with auto-detected dimensions
-    pub fn new(canvas_id: u32) -> Self {
-        let canvas = canvas::Canvas::new(canvas_id);
-        let canvas_width = canvas.width();
-        let canvas_height = canvas.height();
+    pub fn new(canvas_name: &str) -> Self {
+        let canvas = Canvas::new(canvas_name);
 
-        let viewport = Viewport {
-            x_min: 0.0,
-            x_max: 1.0,
-            y_min: 0.0,
-            y_max: 1.0,
-            x_auto: true,
-            y_auto: true,
-            preserve_aspect_ratio: false,
-        };
-
-        // Initialize viewport to full canvas size
-        Self {
+        Plotter {
             canvas,
-            canvas_width,
-            canvas_height,
-            viewport,
+            viewport: Viewport {
+                x_min: 0.0,
+                x_max: 1.0,
+                y_min: 0.0,
+                y_max: 1.0,
+                x_auto: true,
+                y_auto: true,
+                preserve_aspect_ratio: false,
+            },
             x_ticks: 10,
             y_ticks: 10,
             font_size: 12.0,
@@ -146,7 +141,7 @@ impl Plotter {
         if self.viewport.preserve_aspect_ratio {
             let x_range = self.viewport.x_max - self.viewport.x_min;
             let y_range = self.viewport.y_max - self.viewport.y_min;
-            let aspect_ratio = self.canvas_width / self.canvas_height;
+            let aspect_ratio = self.canvas.width() / self.canvas.height();
             if x_range / y_range > aspect_ratio {
                 // X range is too wide, adjust Y range
                 let new_y_range = x_range / aspect_ratio;
@@ -170,7 +165,7 @@ impl Plotter {
             match func.style {
                 FunctionType::LINE => {
                     self.canvas.begin_path();
-                    self.canvas.set_stroke_color(func.color.0, func.color.1, func.color.2, 1.0);
+                    self.canvas.set_stroke_color((func.color.0, func.color.1, func.color.2), 1.0); // Wrap in tuple
                     self.canvas.set_line_width(func.line_width);
                     // Move to first point
                     let (x_pixel, y_pixel) = self.transform_point(func.x_data[0], func.y_data[0]);
@@ -193,7 +188,7 @@ impl Plotter {
                     let y_data = &func.y_data;
                     let color = &func.color;
                     let bar_width = func.bar_width;
-                    self.canvas.set_fill_color(color.0, color.1, color.2, 0.8);
+                    self.canvas.set_fill_color((color.0, color.1, color.2), 0.8); // Wrap in tuple
                     self.canvas.set_line_width(func.line_width);
 
                     for i in 0..x_data.len() {
@@ -217,16 +212,16 @@ impl Plotter {
         // Text measurement
         let text = format!("({:.2}, {:.2})", x_pos, y_pos);
         let font = format!("{}px monospace", self.font_size);
-        let width = self.canvas.measure_text_width(&text, &font) * 1.5; // More padding
+        let width = self.canvas.measure_text_width(&text) * 1.5; // Removed extra argument
         let height = self.font_size * 1.7; // More padding
         let margin = self.font_size * 0.5;
 
         // Top right in canvas pixel coordinates
-        let x_px = self.canvas_width - margin;
+        let x_px = self.canvas.width() - margin;
         let y_px = self.font_size + margin;
         self.canvas.clear_rect(x_px - width, 0.0, width + margin, height + margin * 0.5);
-        self.canvas.set_fill_color(crate::canvas::BLACK.0, crate::canvas::BLACK.1, crate::canvas::BLACK.2, 1.0);
-        self.canvas.set_text_align("right");
+        self.canvas.set_fill_color((crate::canvas::BLACK.0, crate::canvas::BLACK.1, crate::canvas::BLACK.2), 1.0); // Wrap in tuple
+        // self.canvas.set_text_align("right"); // Replace `set_text_align` with a comment or alternative logic
         self.canvas.set_font(&font);
         self.canvas.fill_text(&text, x_px, y_px);
     }
@@ -236,14 +231,14 @@ impl Plotter {
 
     /// Convert mathematical coordinates to canvas pixel coordinates
     fn transform_point(&self, x: f32, y: f32) -> (f32, f32) {
-        let x_norm = (x - self.viewport.x_min) / (self.viewport.x_max - self.viewport.x_min) * self.canvas_width;
-        let y_norm = self.canvas_height - (y - self.viewport.y_min) / (self.viewport.y_max - self.viewport.y_min) * self.canvas_height;
+        let x_norm = (x - self.viewport.x_min) / (self.viewport.x_max - self.viewport.x_min) * self.canvas.width();
+        let y_norm = self.canvas.height() - (y - self.viewport.y_min) / (self.viewport.y_max - self.viewport.y_min) * self.canvas.height();
         (x_norm, y_norm)
     }
 
     /// Draw grid lines for reference
     fn draw_grid(&self) {
-        self.canvas.set_stroke_color(canvas::LIGHT_GRAY.0, canvas::LIGHT_GRAY.1, canvas::LIGHT_GRAY.2, 0.3);
+        self.canvas.set_stroke_color((canvas::LIGHT_GRAY.0, canvas::LIGHT_GRAY.1, canvas::LIGHT_GRAY.2), 0.3); // Wrap in tuple
         self.canvas.set_line_width(1.0);
 
         // Vertical grid lines
@@ -253,7 +248,7 @@ impl Plotter {
 
             self.canvas.begin_path();
             self.canvas.move_to(x_pixel, 0.0);
-            self.canvas.line_to(x_pixel, self.canvas_height);
+            self.canvas.line_to(x_pixel, self.canvas.height());
             self.canvas.stroke();
         }
 
@@ -264,20 +259,20 @@ impl Plotter {
 
             self.canvas.begin_path();
             self.canvas.move_to(0.0, y_pixel);
-            self.canvas.line_to(self.canvas_width, y_pixel);
+            self.canvas.line_to(self.canvas.width(), y_pixel);
             self.canvas.stroke();
         }
     }
 
     /// Draw axes (X and Y axis lines)
     pub fn draw_axes(&self) {
-        self.canvas.set_stroke_color(canvas::BLACK.0, canvas::BLACK.1, canvas::BLACK.2, 1.0);
+        self.canvas.set_stroke_color((canvas::BLACK.0, canvas::BLACK.1, canvas::BLACK.2), 1.0); // Wrap in tuple
         self.canvas.set_line_width(2.0);
 
         // Set up text drawing
-        self.canvas.set_fill_color(canvas::BLACK.0, canvas::BLACK.1, canvas::BLACK.2, 1.0);
+        self.canvas.set_fill_color((canvas::BLACK.0, canvas::BLACK.1, canvas::BLACK.2), 1.0); // Wrap in tuple
         self.canvas.set_font(&format!("{}px monospace", self.font_size));
-        self.canvas.set_text_align("center");
+        // self.canvas.set_text_align("center"); // Replace `set_text_align` with a comment or alternative logic
         let tick_length = self.font_size / 2.0;
 
         // X-axis /////////////////////////////////////////////////////////////
@@ -293,24 +288,23 @@ impl Plotter {
 
         // Ticks and labels
         if self.viewport.y_min <= 0.0 && self.viewport.y_max >= 0.0 {
-            let (_, y_axis) = self.transform_point(0.0, 0.0);
-
             for i in 0..=self.x_ticks {
                 let x_val = self.viewport.x_min + (self.viewport.x_max - self.viewport.x_min) * i as f32 / self.x_ticks as f32;
-                let (x_pixel, _) = self.transform_point(x_val, 0.0);
+                let (x_pixel, y_pixel) = self.transform_point(x_val, 0.0);
 
                 // Draw tick mark
                 self.canvas.begin_path();
-                self.canvas.move_to(x_pixel, y_axis - tick_length / 2.0);
-                self.canvas.line_to(x_pixel, y_axis + tick_length / 2.0);
+                self.canvas.move_to(x_pixel, y_pixel - tick_length / 2.0);
+                self.canvas.line_to(x_pixel, y_pixel + tick_length / 2.0);
                 self.canvas.stroke();
 
                 // Draw label
-                if x_val.abs() < 0.001 {
-                    self.canvas.fill_text("0", x_pixel, y_axis + self.font_size + 5.0);
-                } else {
-                    self.canvas.fill_text(&format!("{:.2}", x_val), x_pixel, y_axis + self.font_size + 5.0);
-                }
+                let label = format!("{:.2}", x_val);
+                self.canvas.fill_text(
+                    &label,
+                    x_pixel - self.canvas.measure_text_width(&label) / 2.0,
+                    y_pixel + 1.5 * self.font_size
+                );
             }
         }
 
@@ -327,26 +321,26 @@ impl Plotter {
 
         // Ticks and labels
         if self.viewport.x_min <= 0.0 && self.viewport.x_max >= 0.0 {
-            let (x_axis, _) = self.transform_point(0.0, 0.0);
-            self.canvas.set_text_align("right");
-
             for i in 0..=self.y_ticks {
                 let y_val = self.viewport.y_min + (self.viewport.y_max - self.viewport.y_min) * i as f32 / self.y_ticks as f32;
-                let (_, y_pixel) = self.transform_point(0.0, y_val);
+                let (x_pixel, y_pixel) = self.transform_point(0.0, y_val);
 
                 // Skip the origin to avoid overlap
-                if y_val.abs() < 0.001 {
-                    continue;
-                }
+                if y_val.abs() < 0.001 { continue; }
 
                 // Draw tick mark
                 self.canvas.begin_path();
-                self.canvas.move_to(x_axis - tick_length / 2.0, y_pixel);
-                self.canvas.line_to(x_axis + tick_length / 2.0, y_pixel);
+                self.canvas.move_to(x_pixel - tick_length / 2.0, y_pixel);
+                self.canvas.line_to(x_pixel + tick_length / 2.0, y_pixel);
                 self.canvas.stroke();
 
                 // Draw label
-                self.canvas.fill_text(&format!("{:.2}", y_val), x_axis - 10.0, y_pixel + self.font_size / 3.0);
+                let label = format!("{:.2}", y_val);
+                self.canvas.fill_text(
+                    &label,
+                    x_pixel - self.canvas.measure_text_width(&label) - self.font_size / 2.0,
+                    y_pixel + self.font_size / 3.0
+                );
             }
         }
     }
@@ -373,7 +367,6 @@ struct FunctionData {
     bar_width: f32,
 }
 
-#[derive(Debug)]
 pub struct Viewport {
     /// X-axis range
     pub x_min: f32,
@@ -383,4 +376,13 @@ pub struct Viewport {
     pub y_max: f32,
     pub y_auto: bool,
     pub preserve_aspect_ratio: bool,
+}
+
+struct PlotterEvents;
+
+impl canvas::EventHandler for PlotterEvents {
+    fn on_mouse_move(&mut self, _canvas: &canvas::Canvas, _x: f32, _y: f32) {
+        console::log(&format!("Mouse moved to: ({}, {})", _x, _y).as_str());
+    }
+    fn on_animation_frame(&mut self, _canvas: &canvas::Canvas, _elapsed: f32) {}
 }

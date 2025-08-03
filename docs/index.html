@@ -9,7 +9,7 @@
     <div class="container">
         <div class="canvas-section">
             <h2>Function Analysis</h2>
-            <canvas id="step-canvas" width="800" height="400"></canvas>
+            <canvas id="example-canvas" width="800" height="400"></canvas>
             <div>
                 <b>Example:</b>
                 <button class="example-btn" data-example="step">Step</button>
@@ -21,12 +21,12 @@
                 <label>to <input type="number" id="example-freq-max" value="8" min="1" max="100" style="width:4em"></label>
             </div>
             <div style="margin-top:2em">
-                <canvas id="power-spectrum-canvas" width="800" height="200"></canvas>
+                <canvas id="spectrum-canvas" width="800" height="200"></canvas>
                 <b>Power Spectrum</b>
             </div>
         </div>
 
-        <div class="canvas-section">
+        <!-- <div class="canvas-section">
             <h2>Fourier Animation</h2>
             <canvas id="animation-canvas" width="800" height="400"></canvas>
             <div>
@@ -39,7 +39,7 @@
                 <label>From <input type="number" id="animation-freq-min" value="1" min="0" max="100" style="width:4em"></label>
                 <label>to <input type="number" id="animation-freq-max"  value="8" min="1" max="100" style="width:4em"></label>
             </div>
-        </div>
+        </div> -->
     </div>
 
     <script type="module" src="./app.js"></script>

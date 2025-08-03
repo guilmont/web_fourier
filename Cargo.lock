@@ -27,8 +27,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "web_canvas"
+version = "0.1.0"
+
+[[package]]
 name = "web_fourier"
 version = "0.1.0"
 dependencies = [
  "num-complex",
+ "web_canvas",
 ]

@@ -1,0 +1,3 @@
+[submodule "vendor/rust_canvas"]
+	path = vendor/rust_canvas
+	url = https://github.com/guilmont/rust_canvas.git

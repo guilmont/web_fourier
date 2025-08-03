@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [lib]
-crate-type = ["cdylib"]  # Compile this crate as a dynamic system library (C-compatible).
+crate-type = ["cdylib"]
 
 [dependencies]
 num-complex = "0.4"
+web_canvas = { path = "vendor/rust_canvas" }
