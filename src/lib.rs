@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::cell::RefCell;
 
 use web_canvas::canvas;
@@ -15,8 +14,6 @@ struct ExampleCache {
 }
 
 thread_local! {
-    // Global registry for Plotter instances by canvas_id (WASM: single-threaded, so RefCell is fine)
-    static PLOTTER_REGISTRY: RefCell<HashMap<String, plotter::Plotter>> = RefCell::new(HashMap::new());
     // Cache for example data, shared across the application
     static EXAMPLE_CACHE: RefCell<Option<ExampleCache>> = RefCell::new(None);
     // // Animation instance for the Fourier series visualization
@@ -57,7 +54,7 @@ fn generate_cache(kind: u32) -> ExampleCache {
 
 fn plot_cached_example(k_min: usize, k_max: usize, cache: &mut ExampleCache) {
     // Start with the example plotter
-    let mut plt = plotter::Plotter::new("example-canvas");
+    let plt = plotter::Plotter::get_or_create("example-canvas");
     let filtered = match cache.fourier.filtered_range(k_min, k_max) {
         Ok(vec) => vec,
         Err(msg) => { console::error(&format!("Error filtering: {}", msg)); return; }
@@ -72,8 +69,6 @@ fn plot_cached_example(k_min: usize, k_max: usize, cache: &mut ExampleCache) {
         return;
     }
     plt.show();
-    // Store the plotter in the registry for mouse move coordinate display
-    PLOTTER_REGISTRY.with(|reg| { reg.borrow_mut().insert("example-canvas".into(), plt); });
 }
 
 fn plot_cached_spectrum(cache: &mut ExampleCache) {
@@ -82,15 +77,13 @@ fn plot_cached_spectrum(cache: &mut ExampleCache) {
     let n = power.len();
     let freq: Vec<f32> = (0..n).map(|k| k as f32).collect();
 
-    let mut plt = plotter::Plotter::new("spectrum-canvas");
+    let plt = plotter::Plotter::get_or_create("spectrum-canvas");
     plt.set_x_range(-5.0, 50.0);
     if let Err(msg) = plt.plot_histogram(&freq, &power, canvas::TAB_GREEN, 1.0) {
         console::error(&format!("Error plotting power spectrum: {}", msg));
         return;
     }
     plt.show();
-    // Store the plotter in the registry for mouse move coordinate display
-    PLOTTER_REGISTRY.with(|reg| { reg.borrow_mut().insert("spectrum-canvas".into(), plt); });
 }
 
 #[no_mangle]

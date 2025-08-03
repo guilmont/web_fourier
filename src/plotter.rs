@@ -3,8 +3,6 @@
 use crate::canvas;
 use crate::canvas::Canvas;
 
-use web_canvas::console;
-
 
 /// Mathematical canvas plotting engine with customizable viewport
 pub struct Plotter {
@@ -22,27 +20,37 @@ pub struct Plotter {
 }
 
 impl Plotter {
-    /// Create a new plotting canvas with auto-detected dimensions
-    pub fn new(canvas_name: &str) -> Self {
+    /// Creates or retrieves a `Plotter` instance for the given canvas.
+    pub fn get_or_create(canvas_name: &str) -> &mut Plotter {
         let canvas = Canvas::new(canvas_name);
 
-        Plotter {
-            canvas,
-            viewport: Viewport {
-                x_min: 0.0,
-                x_max: 1.0,
-                y_min: 0.0,
-                y_max: 1.0,
-                x_auto: true,
-                y_auto: true,
-                preserve_aspect_ratio: false,
-            },
-            x_ticks: 10,
-            y_ticks: 10,
-            font_size: 12.0,
-            hide_axes: false,
-            data: Vec::new(),
-        }
+        // Check if canvas already contains a plotter with the same ID
+        PLOTTER_REGISTRY.with(move |reg| {
+            let mut registry = reg.borrow_mut();
+            let plotter = registry.entry(canvas.id()).or_insert_with(move || {
+                let plotter = Plotter {
+                    canvas: Canvas::new(canvas_name),
+                    viewport: Viewport {
+                        x_min: 0.0,
+                        x_max: 1.0,
+                        y_min: 0.0,
+                        y_max: 1.0,
+                        x_auto: true,
+                        y_auto: true,
+                        preserve_aspect_ratio: false,
+                    },
+                    x_ticks: 10,
+                    y_ticks: 10,
+                    font_size: 12.0,
+                    hide_axes: false,
+                    data: Vec::new(),
+                };
+                plotter.canvas.register_handler(PlotterEvents);
+                plotter
+            });
+            // SAFETY: We assume that the `Plotter` is unique and not shared across threads.
+            unsafe { &mut *(plotter as *mut Plotter) }
+        })
     }
 
     /// Set the X-axis display range
@@ -212,18 +220,17 @@ impl Plotter {
         // Text measurement
         let text = format!("({:.2}, {:.2})", x_pos, y_pos);
         let font = format!("{}px monospace", self.font_size);
-        let width = self.canvas.measure_text_width(&text) * 1.5; // Removed extra argument
-        let height = self.font_size * 1.7; // More padding
-        let margin = self.font_size * 0.5;
+        let width = self.canvas.measure_text_width(&text); // Removed extra argument
+        let height = self.font_size; // More padding
+        let margin = self.font_size;
 
         // Top right in canvas pixel coordinates
-        let x_px = self.canvas.width() - margin;
-        let y_px = self.font_size + margin;
-        self.canvas.clear_rect(x_px - width, 0.0, width + margin, height + margin * 0.5);
+        let x_px = self.canvas.width() - width;
+        self.canvas.clear_rect(x_px - margin, 0.0, width + margin, height + margin);
         self.canvas.set_fill_color((crate::canvas::BLACK.0, crate::canvas::BLACK.1, crate::canvas::BLACK.2), 1.0); // Wrap in tuple
         // self.canvas.set_text_align("right"); // Replace `set_text_align` with a comment or alternative logic
         self.canvas.set_font(&font);
-        self.canvas.fill_text(&text, x_px, y_px);
+        self.canvas.fill_text(&text, x_px, height); // Adjusted y position for better visibility
     }
 
     /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -378,11 +385,25 @@ pub struct Viewport {
     pub preserve_aspect_ratio: bool,
 }
 
+use std::cell::RefCell;
+use std::collections::HashMap;
+
+thread_local! {
+    // Global registry for Plotter instances by canvas_id (WASM: single-threaded, so RefCell is fine)
+    static PLOTTER_REGISTRY: RefCell<HashMap<u32, Plotter>> = RefCell::new(HashMap::new());
+}
+
 struct PlotterEvents;
 
 impl canvas::EventHandler for PlotterEvents {
-    fn on_mouse_move(&mut self, _canvas: &canvas::Canvas, _x: f32, _y: f32) {
-        console::log(&format!("Mouse moved to: ({}, {})", _x, _y).as_str());
+    fn on_mouse_move(&mut self, canvas: &canvas::Canvas, x: f32, y: f32) {
+        // Call the existing `show_coordinates` function to display coordinates
+        PLOTTER_REGISTRY.with(|reg| {
+            if let Some(plotter) = reg.borrow_mut().get_mut(&canvas.id()) {
+                plotter.show_coordinates(x, y);
+            }
+        });
     }
+
     fn on_animation_frame(&mut self, _canvas: &canvas::Canvas, _elapsed: f32) {}
 }
