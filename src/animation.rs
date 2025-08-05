@@ -1,188 +1,587 @@
-// use crate::math;
-// use crate::plotter;
-// use crate::canvas;
+use crate::math;
+use web_canvas::canvas;
+use std::cell::RefCell;
 
-// mod js {
-//     #[link(wasm_import_module = "Animation")]
-//     extern "C" {
-//         pub fn start_animation_loop(canvas_id: u32);
-//         pub fn stop_animation_loop(canvas_id: u32);
-//     }
-// }
-
-// // Define constants for magic numbers
-// const Y_RANGE: (f32, f32) = (-10.0, 10.0);
-// const LINE_WIDTH_ORIGINAL: f32 = 1.0;
-// const LINE_WIDTH_RECONSTRUCTED: f32 = 2.0;
-// const ARROW_WIDTH: f32 = 2.0;
-
-// pub struct Fourier<'a> {
-//     // Fourier data
-//     fourier_x: math::Fourier,
-//     fourier_y: math::Fourier,
-//     k_min: usize,
-//     k_max: usize,
-
-//     // Canvas
-//     canvas: &'a mut canvas::Canvas, // Use a mutable reference to the `Canvas` object
-
-//     // Animation control
-//     current_point: f64,
-//     point_speed: f64,
-
-//     is_paused: bool,
-//     is_stopped: bool,
-// }
-
-// /// The `Fourier` struct represents a Fourier series and its animation state.
-// /// It includes methods for controlling the animation and plotting the Fourier components.
-// impl<'a> Fourier<'a> {
-//     /// Creates a new `Fourier` instance with the given data and cutoff frequency.
-//     ///
-//     /// # Arguments
-//     /// * `x_data` - A vector of x-coordinates.
-//     /// * `y_data` - A vector of y-coordinates.
-//     /// * `cutoff` - The maximum frequency to include in the Fourier series.
-//     ///
-//     /// # Returns
-//     /// A `Result` containing the `Fourier` instance or an error message.
-//     pub fn new(x_data: Vec<f32>, y_data: Vec<f32>, k_min: usize, k_max: usize) -> Result<Self, String> {
-//         if x_data.len() != y_data.len() {
-//             return Err("X and Y data must have same length".into());
-//         }
-//         Ok(Fourier {
-//             fourier_x: math::Fourier::new(x_data)?,
-//             fourier_y: math::Fourier::new(y_data)?,
-//             k_min,
-//             k_max,
-//             canvas: canvas::Canvas::new("animation_canvas", Some(DefaultEventHandler)), // Use the mutable reference directly
-//             current_point: 0.0,
-//             point_speed: 1.0,
-//             is_paused: true,
-//             is_stopped: true,
-//         })
-//     }
-
-//     /// Start the self-contained animation loop
-//     pub fn start(&mut self) {
-//         self.canvas.start_animation_loop(); // Use the public method
-//         self.is_paused = false;
-//         self.is_stopped = false;
-//     }
-
-//     /// Stop the animation loop
-//     pub fn stop(&mut self) {
-//         self.canvas.stop_animation_loop(); // Use the public method
-//         self.is_stopped = true;
-//         self.current_point = 0.0;
-//     }
-
-//     /// Advances the animation by one step, updating the plot.
-//     pub fn step(&mut self) {
-//         // If not running, do nothing
-//         if self.is_paused { return; }
-
-//         self.current_point += self.point_speed;
-//         if self.current_point < 0.0 {
-//             self.current_point = self.fourier_x.size() as f64;
-//         }
-
-//         let current_point = (self.fourier_x.size() + self.current_point as usize) % self.fourier_x.size();
-
-//         let mut plt = Self::setup_plotter_from_canvas(&self.canvas);
-//         self.plot_original_curve(&mut plt);
-//         self.plot_reconstructed_curve(&mut plt, current_point);
-//         self.plot_fourier_components(&mut plt, current_point);
-
-//         plt.show();
-//     }
-
-//     // Control methods
-//     /// Resumes the animation.
-//     pub fn play(&mut self) { self.is_paused = false; }
-//     /// Pauses the animation.
-//     pub fn pause(&mut self) { self.is_paused = true; }
-//     /// Checks if the animation is paused.
-//     pub fn is_paused(&self) -> bool { self.is_paused }
-//     /// Checks if the animation is stopped.
-//     pub fn is_stopped(&self) -> bool { self.is_stopped }
+thread_local! {
+    // Animation instance for the Fourier series visualization
+    static ANIMATION: RefCell<Option<Fourier>> = RefCell::new(None);
+}
 
 
-//     /// Sets the speed of the animation.
-//     ///
-//     /// # Arguments
-//     /// * `speed` - The new speed value.
-//     pub fn set_speed(&mut self, speed: f64) { self.point_speed = speed; }
-//     /// Gets the current speed of the animation.
-//     pub fn speed(&self) -> f64 { self.point_speed }
+// Define constants for magic numbers
+const LINE_WIDTH_ORIGINAL: f32 = 1.0;
+const LINE_WIDTH_RECONSTRUCTED: f32 = 2.0;
+const ARROW_WIDTH: f32 = 2.0;
 
+#[derive(Clone)]
+struct Viewport {
+    x_min: f32,
+    x_max: f32,
+    y_min: f32,
+    y_max: f32,
+    preserve_aspect_ratio: bool,
+}
 
-//     /////////////////////////////////////////////////////////////////////////////////////
-//     /// Private methods for plotting
-//     /////////////////////////////////////////////////////////////////////////////////////
+impl Default for Viewport {
+    fn default() -> Self {
+        Self {
+            x_min: -10.0,
+            x_max: 10.0,
+            y_min: -10.0,
+            y_max: 10.0,
+            preserve_aspect_ratio: true,
+        }
+    }
+}
 
-//     /// Configures and returns a new plotter instance with predefined ranges.
-//     fn setup_plotter_from_canvas(_canvas: &canvas::Canvas) -> plotter::Plotter { // Mark `canvas` as unused
-//         let mut plt = plotter::Plotter::new(); // Remove argument
-//         plt.preserve_aspect_ratio(true);
-//         plt.set_y_range(Y_RANGE.0, Y_RANGE.1);
-//         plt
-//     }
+pub struct Fourier {
+    // Fourier data
+    fourier_x: math::Fourier,
+    fourier_y: math::Fourier,
+    k_min: usize,
+    k_max: usize,
 
-//     /// Plots the original curve on the given plotter.
-//     fn plot_original_curve(&self, plt: &mut plotter::Plotter) {
-//         let _ = plt.plot_line(
-//             self.fourier_x.original(),
-//             self.fourier_y.original(),
-//             canvas::TAB_BLUE,
-//             LINE_WIDTH_ORIGINAL,
-//         );
-//     }
+    // Canvas
+    canvas: canvas::Canvas,
 
-//     /// Plots the reconstructed curve up to the current frequency on the given plotter.
-//     fn plot_reconstructed_curve(&self, plt: &mut plotter::Plotter, current_point: usize) {
-//         let (k_min, k_max) = self.clamped_frequency_range();
-//         let mut recon_x = self.fourier_x.filtered_range(k_min, k_max).unwrap_or_else(|_| vec![0.0; self.fourier_x.size()]);
-//         let mut recon_y = self.fourier_y.filtered_range(k_min, k_max).unwrap_or_else(|_| vec![0.0; self.fourier_y.size()]);
-//         recon_x.truncate(current_point + 1);
-//         recon_y.truncate(current_point + 1);
-//         let _ = plt.plot_line(&recon_x, &recon_y, canvas::TAB_ORANGE, LINE_WIDTH_RECONSTRUCTED);
-//     }
+    // Animation control
+    current_point: f64,
+    point_speed: f64,
 
-//     /// Plots the Fourier components as vectors on the given plotter.
-//     fn plot_fourier_components(&self, plt: &mut plotter::Plotter, current_point: usize) {
-//         let mut current_x = 0.0;
-//         let mut current_y = 0.0;
-//         let (k_min, k_max) = self.clamped_frequency_range();
-//         for k in k_min..=k_max {
-//             if let (Ok(next_x), Ok(next_y)) = (
-//                 self.fourier_x.get_component(k, current_point),
-//                 self.fourier_y.get_component(k, current_point),
-//             ) {
-//                 let next_x = current_x + next_x;
-//                 let next_y = current_y + next_y;
-//                 let _ = plt.plot_arrow(&[current_x, next_x], &[current_y, next_y], canvas::TAB_GREEN, ARROW_WIDTH);
-//                 current_x = next_x;
-//                 current_y = next_y;
-//             }
-//         }
-//     }
+    is_paused: bool,
+    is_stopped: bool,
 
-//     /// Returns the clamped frequency range (k_min, k_max) based on the maximum frequency.
-//     fn clamped_frequency_range(&self) -> (usize, usize) {
-//         let max_k = self.fourier_x.max_frequency();
-//         let k_min = if self.k_min > max_k { max_k } else { self.k_min };
-//         let k_max = if self.k_max > max_k { max_k } else { self.k_max };
-//         (k_min, k_max)
-//     }
-// }
+    // Viewport for plotting
+    viewport: Viewport,
+}
 
-// struct DefaultEventHandler;
+/// The `Fourier` struct represents a Fourier series and its animation state.
+/// It includes methods for controlling the animation and plotting the Fourier components.
+impl Fourier {
+    /// Creates a new `Fourier` instance with the given data and cutoff frequency.
+    /// Note: This creates new Fourier transforms internally. For better performance
+    /// when you already have Fourier transforms, use `from_fourier` instead.
+    ///
+    /// # Arguments
+    /// * `x_data` - A vector of x-coordinates.
+    /// * `y_data` - A vector of y-coordinates.
+    /// * `k_min` - The minimum frequency to include in the Fourier series.
+    /// * `k_max` - The maximum frequency to include in the Fourier series.
+    ///
+    /// # Returns
+    /// A `Result` containing the `Fourier` instance or an error message.
+    #[allow(dead_code)] // Keep for API completeness
+    pub fn new(x_data: Vec<f32>, y_data: Vec<f32>, k_min: usize, k_max: usize) -> Result<Self, String> {
+        if x_data.len() != y_data.len() {
+            return Err("X and Y data must have same length".into());
+        }
+        let fourier = Fourier {
+            fourier_x: math::Fourier::new(x_data)?,
+            fourier_y: math::Fourier::new(y_data)?,
+            k_min,
+            k_max,
+            canvas: canvas::Canvas::from_element("animation-canvas"),
+            current_point: 0.0,
+            point_speed: 1.0,
+            is_paused: true,
+            is_stopped: true,
+            viewport: Viewport::default(),
+        };
 
-// impl canvas::EventHandler for DefaultEventHandler {
-//     fn on_mouse_move(&mut self, _canvas: &canvas::Canvas, _x: f32, _y: f32) {}
-//     fn on_mouse_down(&mut self, _canvas: &canvas::Canvas, _x: f32, _y: f32) {}
-//     fn on_mouse_up(&mut self, _canvas: &canvas::Canvas, _x: f32, _y: f32) {}
-//     fn on_key_down(&mut self, _canvas: &canvas::Canvas, _key_code: u32) {}
-//     fn on_animation_frame(&mut self, _canvas: &canvas::Canvas, _elapsed: f32) {}
-// }
+        // Register the event handler - we'll handle animation frame calls
+        fourier.canvas.register_handler(AnimationEventHandler);
+        Ok(fourier)
+    }
+
+    /// Creates a new `Fourier` instance from pre-computed Fourier transforms.
+    /// This is more efficient when you already have the Fourier transforms.
+    ///
+    /// # Arguments
+    /// * `fourier_x` - Pre-computed Fourier transform for x-coordinates.
+    /// * `fourier_y` - Pre-computed Fourier transform for y-coordinates.
+    /// * `k_min` - The minimum frequency to include in the Fourier series.
+    /// * `k_max` - The maximum frequency to include in the Fourier series.
+    ///
+    /// # Returns
+    /// A `Result` containing the `Fourier` instance or an error message.
+    pub fn from_fourier(fourier_x: math::Fourier, fourier_y: math::Fourier, k_min: usize, k_max: usize) -> Result<Self, String> {
+        if fourier_x.size() != fourier_y.size() {
+            return Err("X and Y Fourier transforms must have same size".into());
+        }
+        let fourier = Fourier {
+            fourier_x,
+            fourier_y,
+            k_min,
+            k_max,
+            canvas: canvas::Canvas::from_element("animation-canvas"),
+            current_point: 0.0,
+            point_speed: 1.0,
+            is_paused: true,
+            is_stopped: true,
+            viewport: Viewport::default(),
+        };
+
+        // Register the event handler - we'll handle animation frame calls
+        fourier.canvas.register_handler(AnimationEventHandler);
+        Ok(fourier)
+    }
+
+    /// Start the self-contained animation loop
+    pub fn start(&mut self) {
+        self.calculate_viewport();
+        self.is_paused = false;
+        self.is_stopped = false;
+
+        self.canvas.start_animation_loop();
+    }
+
+    /// Stop the animation loop
+    pub fn stop(&mut self) {
+        self.is_stopped = true;
+        self.current_point = 0.0;
+        self.canvas.stop_animation_loop();
+    }
+
+    /// Advances the animation by one step, updating the plot.
+    pub fn step(&mut self) {
+        // If not running, do nothing
+        if self.is_paused { return; }
+
+        self.current_point += self.point_speed;
+        if self.current_point < 0.0 {
+            self.current_point = self.fourier_x.size() as f64;
+        }
+
+        let current_point = (self.fourier_x.size() + self.current_point as usize) % self.fourier_x.size();
+
+        self.plot_all(current_point);
+    }
+
+    // Control methods
+    /// Resumes the animation.
+    pub fn play(&mut self) { self.is_paused = false; }
+    /// Pauses the animation.
+    pub fn pause(&mut self) { self.is_paused = true; }
+    /// Checks if the animation is paused.
+    pub fn is_paused(&self) -> bool { self.is_paused }
+    /// Checks if the animation is stopped.
+    pub fn is_stopped(&self) -> bool { self.is_stopped }
+
+    /// Sets the speed of the animation.
+    ///
+    /// # Arguments
+    /// * `speed` - The new speed value.
+    pub fn set_speed(&mut self, speed: f64) { self.point_speed = speed; }
+    /// Gets the current speed of the animation.
+    pub fn speed(&self) -> f64 { self.point_speed }
+
+    /////////////////////////////////////////////////////////////////////////////////////
+    /// Private methods for plotting
+    /////////////////////////////////////////////////////////////////////////////////////
+
+    /// Calculate viewport based on data bounds and center of mass
+    fn calculate_viewport(&mut self) {
+        // Calculate center of mass from the original data
+        // Since data is already centered in math::Fourier, we just need to find bounds
+        let x_data = self.fourier_x.original();
+        let y_data = self.fourier_y.original();
+
+        // Find bounds of all data (already centered)
+        let mut x_min = f32::INFINITY;
+        let mut x_max = f32::NEG_INFINITY;
+        let mut y_min = f32::INFINITY;
+        let mut y_max = f32::NEG_INFINITY;
+
+        // Check original data
+        for &x in x_data {
+            if x < x_min { x_min = x; }
+            if x > x_max { x_max = x; }
+        }
+        for &y in y_data {
+            if y < y_min { y_min = y; }
+            if y > y_max { y_max = y; }
+        }
+
+        // Check fourier component endpoints
+        let (k_min, k_max) = self.clamped_frequency_range();
+        let mut current_x = 0.0;
+        let mut current_y = 0.0;
+        for k in k_min..=k_max {
+            if let (Ok(next_x), Ok(next_y)) = (
+                self.fourier_x.get_component(k, 0),
+                self.fourier_y.get_component(k, 0),
+            ) {
+                current_x += next_x;
+                current_y += next_y;
+                if current_x < x_min { x_min = current_x; }
+                if current_x > x_max { x_max = current_x; }
+                if current_y < y_min { y_min = current_y; }
+                if current_y > y_max { y_max = current_y; }
+            }
+        }
+
+        // Add some padding
+        let x_range = x_max - x_min;
+        let y_range = y_max - y_min;
+        let padding = 0.1;
+        x_min -= padding * x_range;
+        x_max += padding * x_range;
+        y_min -= padding * y_range;
+        y_max += padding * y_range;
+
+        // Preserve aspect ratio if needed
+        if self.viewport.preserve_aspect_ratio {
+            let aspect_ratio = self.canvas.width() / self.canvas.height();
+            let data_aspect = (x_max - x_min) / (y_max - y_min);
+
+            if data_aspect > aspect_ratio {
+                // Data is wider, expand y range
+                let new_y_range = (x_max - x_min) / aspect_ratio;
+                let y_center = (y_max + y_min) / 2.0;
+                y_min = y_center - new_y_range / 2.0;
+                y_max = y_center + new_y_range / 2.0;
+            } else {
+                // Data is taller, expand x range
+                let new_x_range = (y_max - y_min) * aspect_ratio;
+                let x_center = (x_max + x_min) / 2.0;
+                x_min = x_center - new_x_range / 2.0;
+                x_max = x_center + new_x_range / 2.0;
+            }
+        }
+
+        self.viewport.x_min = x_min;
+        self.viewport.x_max = x_max;
+        self.viewport.y_min = y_min;
+        self.viewport.y_max = y_max;
+    }
+
+    /// Convert viewport coordinates to canvas pixel coordinates
+    fn viewport_to_canvas(&self, x: f32, y: f32) -> (f32, f32) {
+        let x_pos = (x - self.viewport.x_min) / (self.viewport.x_max - self.viewport.x_min) * self.canvas.width();
+        let y_pos = self.canvas.height() - (y - self.viewport.y_min) / (self.viewport.y_max - self.viewport.y_min) * self.canvas.height();
+        (x_pos, y_pos)
+    }
+
+    /// Plot all components of the animation
+    fn plot_all(&self, current_point: usize) {
+        self.canvas.clear();
+        self.plot_dimensional_indicators(current_point);
+        self.plot_original_curve();
+        self.plot_reconstructed_curve(current_point);
+        self.plot_fourier_components(current_point);
+    }
+
+    /// Draw dimensional indicators like axes and scale markers
+    fn plot_dimensional_indicators(&self, current_point: usize) {
+        let canvas_width = self.canvas.width();
+        let canvas_height = self.canvas.height();
+
+        // Draw coordinate axes through the origin (0,0)
+        let (origin_x, origin_y) = self.viewport_to_canvas(0.0, 0.0);
+
+        // X-axis (horizontal line through origin)
+        if origin_y >= 0.0 && origin_y <= canvas_height {
+            self.canvas.draw_line(0.0, origin_y, canvas_width, origin_y, 1.0, canvas::LIGHT_GRAY);
+        }
+
+        // Y-axis (vertical line through origin)
+        if origin_x >= 0.0 && origin_x <= canvas_width {
+            self.canvas.draw_line(origin_x, 0.0, origin_x, canvas_height, 1.0, canvas::LIGHT_GRAY);
+        }
+
+        // Draw scale markers and labels
+        let font = "10px monospace";
+
+        // Calculate nice scale intervals
+        let x_range = self.viewport.x_max - self.viewport.x_min;
+        let y_range = self.viewport.y_max - self.viewport.y_min;
+
+        let x_interval = self.nice_interval(x_range / 8.0); // About 8 ticks across
+        let y_interval = self.nice_interval(y_range / 6.0); // About 6 ticks vertically
+
+        // Draw X-axis scale markers
+        let x_start = (self.viewport.x_min / x_interval).floor() * x_interval;
+        let mut x_val = x_start;
+        while x_val <= self.viewport.x_max {
+            if (x_val - 0.0).abs() > x_interval * 0.1 { // Skip origin to avoid clutter
+                let (tick_x, tick_y) = self.viewport_to_canvas(x_val, 0.0);
+                if tick_x >= 0.0 && tick_x <= canvas_width {
+                    // Draw tick mark
+                    self.canvas.draw_line(tick_x, tick_y - 3.0, tick_x, tick_y + 3.0, 1.0, canvas::DARK_GRAY);
+                    // Draw label
+                    let label = if x_val.abs() < 0.01 { "0".to_string() } else { format!("{:.1}", x_val) };
+                    let text_width = self.canvas.measure_text_width(&label, font);
+                    self.canvas.draw_text(&label, tick_x - text_width / 2.0, tick_y + 15.0, font, canvas::DARK_GRAY);
+                }
+            }
+            x_val += x_interval;
+        }
+
+        // Draw Y-axis scale markers
+        let y_start = (self.viewport.y_min / y_interval).floor() * y_interval;
+        let mut y_val = y_start;
+        while y_val <= self.viewport.y_max {
+            if (y_val - 0.0).abs() > y_interval * 0.1 { // Skip origin to avoid clutter
+                let (tick_x, tick_y) = self.viewport_to_canvas(0.0, y_val);
+                if tick_y >= 0.0 && tick_y <= canvas_height {
+                    // Draw tick mark
+                    self.canvas.draw_line(tick_x - 3.0, tick_y, tick_x + 3.0, tick_y, 1.0, canvas::DARK_GRAY);
+                    // Draw label
+                    let label = if y_val.abs() < 0.01 { "0".to_string() } else { format!("{:.1}", y_val) };
+                    self.canvas.draw_text(&label, tick_x - 25.0, tick_y + 3.0, font, canvas::DARK_GRAY);
+                }
+            }
+            y_val += y_interval;
+        }
+
+        // Draw origin marker
+        if origin_x >= 0.0 && origin_x <= canvas_width && origin_y >= 0.0 && origin_y <= canvas_height {
+            self.canvas.fill_circle(origin_x, origin_y, 2.0, canvas::BLACK);
+        }
+
+        // Draw current point indicator
+        let (k_min, k_max) = self.clamped_frequency_range();
+        let mut tip_x = 0.0;
+        let mut tip_y = 0.0;
+        for k in k_min..=k_max {
+            if let (Ok(next_x), Ok(next_y)) = (
+                self.fourier_x.get_component(k, current_point),
+                self.fourier_y.get_component(k, current_point),
+            ) {
+                tip_x += next_x;
+                tip_y += next_y;
+            }
+        }
+        let (tip_px, tip_py) = self.viewport_to_canvas(tip_x, tip_y);
+        if tip_px >= 0.0 && tip_px <= canvas_width && tip_py >= 0.0 && tip_py <= canvas_height {
+            self.canvas.fill_circle(tip_px, tip_py, 3.0, canvas::TAB_RED);
+        }
+    }
+
+    /// Calculate a "nice" interval for scale markings
+    fn nice_interval(&self, rough_interval: f32) -> f32 {
+        let magnitude = 10_f32.powf(rough_interval.log10().floor());
+        let normalized = rough_interval / magnitude;
+
+        let nice_normalized = if normalized < 1.5 {
+            1.0
+        } else if normalized < 3.0 {
+            2.0
+        } else if normalized < 7.0 {
+            5.0
+        } else {
+            10.0
+        };
+
+        nice_normalized * magnitude
+    }
+
+    /// Plots the original curve on the canvas.
+    fn plot_original_curve(&self) {
+        let x_orig = self.fourier_x.original();
+        let y_orig = self.fourier_y.original();
+
+        if x_orig.len() < 2 { return; }
+
+        let mut x_pixels = Vec::with_capacity(x_orig.len());
+        let mut y_pixels = Vec::with_capacity(y_orig.len());
+
+        for i in 0..x_orig.len() {
+            // Data is already centered in math::Fourier
+            let (x_px, y_px) = self.viewport_to_canvas(x_orig[i], y_orig[i]);
+            x_pixels.push(x_px);
+            y_pixels.push(y_px);
+        }
+
+        self.canvas.stroke_curve(&x_pixels, &y_pixels, LINE_WIDTH_ORIGINAL, canvas::TAB_BLUE);
+    }
+
+    /// Plots the reconstructed curve up to the current frequency on the canvas.
+    fn plot_reconstructed_curve(&self, current_point: usize) {
+        let (k_min, k_max) = self.clamped_frequency_range();
+        let recon_x = self.fourier_x.filtered_range(k_min, k_max).unwrap_or_else(|_| vec![0.0; self.fourier_x.size()]);
+        let recon_y = self.fourier_y.filtered_range(k_min, k_max).unwrap_or_else(|_| vec![0.0; self.fourier_y.size()]);
+
+        if current_point < 2 || recon_x.len() < 2 { return; }
+
+        let end_point = (current_point + 1).min(recon_x.len());
+        let mut x_pixels = Vec::with_capacity(end_point);
+        let mut y_pixels = Vec::with_capacity(end_point);
+
+        for i in 0..end_point {
+            // Data is already centered in math::Fourier
+            let (x_px, y_px) = self.viewport_to_canvas(recon_x[i], recon_y[i]);
+            x_pixels.push(x_px);
+            y_pixels.push(y_px);
+        }
+
+        self.canvas.stroke_curve(&x_pixels, &y_pixels, LINE_WIDTH_RECONSTRUCTED, canvas::TAB_ORANGE);
+    }
+
+    /// Plots the Fourier components as vectors on the canvas.
+    fn plot_fourier_components(&self, current_point: usize) {
+        let mut current_x = 0.0; // Data is already centered
+        let mut current_y = 0.0;
+        let (k_min, k_max) = self.clamped_frequency_range();
+
+        for k in k_min..=k_max {
+            if let (Ok(next_x), Ok(next_y)) = (
+                self.fourier_x.get_component(k, current_point),
+                self.fourier_y.get_component(k, current_point),
+            ) {
+                let next_x = current_x + next_x;
+                let next_y = current_y + next_y;
+
+                let (start_px, start_py) = self.viewport_to_canvas(current_x, current_y);
+                let (end_px, end_py) = self.viewport_to_canvas(next_x, next_y);
+
+                self.canvas.draw_arrow(start_px, start_py, end_px, end_py, ARROW_WIDTH, canvas::TAB_GREEN);
+
+                current_x = next_x;
+                current_y = next_y;
+            }
+        }
+    }
+
+    /// Returns the clamped frequency range (k_min, k_max) based on the maximum frequency.
+    fn clamped_frequency_range(&self) -> (usize, usize) {
+        let max_k = self.fourier_x.max_frequency();
+        let k_min = if self.k_min > max_k { max_k } else { self.k_min };
+        let k_max = if self.k_max > max_k { max_k } else { self.k_max };
+        (k_min, k_max)
+    }
+
+}
+
+struct AnimationEventHandler;
+
+impl canvas::EventHandler for AnimationEventHandler {
+    fn on_mouse_down(&mut self, _canvas: &canvas::Canvas, _x: f32, _y: f32, button: canvas::MouseButton) {
+        match button {
+            canvas::MouseButton::Left => {
+                // Left click to pause/play animation
+                ANIMATION.with(|cell| {
+                    if let Some(ref mut animation) = *cell.borrow_mut() {
+                        if animation.is_paused() {
+                            animation.play();
+                        } else {
+                            animation.pause();
+                        }
+                    }
+                });
+            },
+            canvas::MouseButton::Right => {
+                // Right click to reset animation speed to normal
+                ANIMATION.with(|cell| {
+                    if let Some(ref mut animation) = *cell.borrow_mut() {
+                        animation.set_speed(1.0);
+                    }
+                });
+            },
+            _ => {}
+        }
+    }
+
+    fn on_key_down(&mut self, _canvas: &canvas::Canvas, key_code: canvas::KeyCode) {
+        // Add keyboard controls for animation
+        ANIMATION.with(|cell| {
+            if let Some(ref mut animation) = *cell.borrow_mut() {
+                match key_code {
+                    canvas::KeyCode::Space => {
+                        // Space bar to pause/play
+                        if animation.is_paused() {
+                            animation.play();
+                        } else {
+                            animation.pause();
+                        }
+                    },
+                    canvas::KeyCode::ArrowUp => {
+                        // Arrow up to increase speed
+                        animation.set_speed(animation.speed() + 0.25);
+                    },
+                    canvas::KeyCode::ArrowDown => {
+                        // Arrow down to decrease speed
+                        let new_speed = (animation.speed() - 0.25).max(0.1);
+                        animation.set_speed(new_speed);
+                    },
+                    canvas::KeyCode::R => {
+                        // R key to reset speed
+                        animation.set_speed(1.0);
+                    },
+                    _ => {}
+                }
+            }
+        });
+    }
+
+    fn on_animation_frame(&mut self, _canvas: &canvas::Canvas, _elapsed: f32) {
+        ANIMATION.with(|cell| {
+            if let Some(ref mut animation) = *cell.borrow_mut() {
+                animation.step();
+            }
+        });
+    }
+}
+
+/// Set the animation instance
+pub fn set_animation(animation: Fourier) {
+    ANIMATION.with(|cell| {
+        *cell.borrow_mut() = Some(animation);
+    });
+}
+
+/// Clear the animation instance
+pub fn clear_animation() {
+    ANIMATION.with(|cell| {
+        *cell.borrow_mut() = None;
+    });
+}
+
+/// Play/pause animation with frequency range
+pub fn play_pause_animation(k_min: usize, k_max: usize, example_code: usize, init_fn: impl FnOnce(usize, usize, usize)) {
+    ANIMATION.with(|cell| {
+        let mut borrow = cell.borrow_mut();
+        if let Some(ref mut var) = *borrow {
+            if var.is_stopped() {
+                drop(borrow);
+                init_fn(k_min, k_max, example_code);
+            } else if var.is_paused() {
+                var.play();
+            } else if var.speed() > 1.0 || var.speed() < 1.0 {
+                var.set_speed(1.0);
+            } else {
+                var.pause();
+            }
+        } else {
+            drop(borrow);
+            init_fn(k_min, k_max, example_code);
+        }
+    });
+}
+
+/// Stop the animation
+pub fn stop_animation() {
+    ANIMATION.with(|cell| {
+        if let Some(ref mut var) = *cell.borrow_mut() {
+            var.stop();
+        }
+    });
+}
+
+/// Increase animation speed
+pub fn increase_animation_speed() {
+    ANIMATION.with(|cell| {
+        if let Some(ref mut var) = *cell.borrow_mut() {
+            var.set_speed(var.speed() + 0.5);
+        }
+    });
+}
+
+/// Decrease animation speed
+pub fn decrease_animation_speed() {
+    ANIMATION.with(|cell| {
+        if let Some(ref mut var) = *cell.borrow_mut() {
+            var.set_speed(var.speed() - 0.5);
+        }
+    });
+}

@@ -9,6 +9,7 @@ pub struct Fourier {
 
 impl Fourier {
     /// Creates a new `Fourier` instance with the given data.
+    /// The data is automatically centered (mean removed) before computing the DFT.
     ///
     /// # Arguments
     /// * `original` - A vector of input data.
@@ -20,13 +21,18 @@ impl Fourier {
         if total_size == 0 {
             return Err("Input vector is empty".to_string());
         }
+
+        // Calculate mean and center the data
+        let mean: f32 = original.iter().sum::<f32>() / (total_size as f32);
+        let centered_data: Vec<f32> = original.iter().map(|&x| x - mean).collect();
+
         let coeff = 2.0 * std::f32::consts::PI / (total_size as f32);
         // Compute DFT coefficients for frequencies 0 to N/2
         let max_k = total_size / 2;
         let mut transform = vec![Complex32::new(0.0, 0.0); max_k + 1];
         for k in 0..=max_k {
             let mut sum = Complex32::new(0.0, 0.0);
-            for (i, &val) in original.iter().enumerate() {
+            for (i, &val) in centered_data.iter().enumerate() {
                 if !val.is_finite() {
                     return Err("Input vector contains invalid values (NaN or Inf)".to_string());
                 }
@@ -36,7 +42,7 @@ impl Fourier {
             }
             transform[k] = sum / (total_size as f32);
         }
-        Ok(Fourier { original, transform, coeff })
+        Ok(Fourier { original: centered_data, transform, coeff })
     }
 
     /// Reconstruct a filtered signal using only frequencies in the given range [k_min, k_max] (inclusive).

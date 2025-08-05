@@ -24,11 +24,11 @@ pub struct Plotter {
 impl Plotter {
     /// Creates or retrieves a `Plotter` instance for the given canvas.
     pub fn get_or_create(canvas_name: &str) -> &mut Plotter {
-        let canvas = Canvas::from_element(canvas_name);
 
         // Check if canvas already contains a plotter with the same ID
         PLOTTER_REGISTRY.with(move |reg| {
             let mut registry = reg.borrow_mut();
+            let canvas = Canvas::from_element(canvas_name);
             let plotter = registry.entry(canvas.id()).or_insert_with(move || {
                 let plotter = Plotter {
                     canvas: Canvas::from_element(canvas_name),
@@ -52,6 +52,12 @@ impl Plotter {
                 plotter.canvas.register_handler(PlotterEvents);
                 plotter
             });
+
+            // Clear previous data to avoid accumulation
+            plotter.data.clear();
+            plotter.viewport.x_auto = true;
+            plotter.viewport.y_auto = true;
+
             // SAFETY: We assume that the `Plotter` is unique and not shared across threads.
             unsafe { &mut *(plotter as *mut Plotter) }
         })
@@ -498,6 +504,4 @@ impl canvas::EventHandler for PlotterEvents {
             }
         });
     }
-
-    fn on_animation_frame(&mut self, _canvas: &canvas::Canvas, _elapsed: f32) {}
 }

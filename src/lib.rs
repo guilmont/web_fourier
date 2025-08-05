@@ -16,8 +16,6 @@ struct ExampleCache {
 thread_local! {
     // Cache for example data, shared across the application
     static EXAMPLE_CACHE: RefCell<Option<ExampleCache>> = RefCell::new(None);
-    // // Animation instance for the Fourier series visualization
-    // static ANIMATION: RefCell<animation::Fourier> = RefCell::new(animation::Fourier::default());
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -78,7 +76,7 @@ fn plot_cached_spectrum(cache: &mut ExampleCache) {
     let freq: Vec<f32> = (0..n).map(|k| k as f32).collect();
 
     let plt = plotter::Plotter::get_or_create("spectrum-canvas");
-    plt.set_x_range(-5.0, 50.0);
+    plt.set_x_range(-5.0, freq.len() as f32 / 3.0);
     if let Err(msg) = plt.plot_histogram(&freq, &power, canvas::TAB_GREEN, 1.0) {
         console::error(&format!("Error plotting power spectrum: {}", msg));
         return;
@@ -110,89 +108,135 @@ pub fn plot_example(k_min: usize, k_max: usize, kind: u32) {
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 
-// fn gen_cyclic_function() -> (Vec<f32>, Vec<f32>) {
-//     const BIG_R: f32 = 5.0;
-//     const SMALL_R: f32 = 1.0;
-//     const D: f32 = 2.0;
+fn gen_animation_function(example: usize) -> (Vec<f32>, Vec<f32>) {
+    const TOTAL_NUM_POINTS: usize = 400;
+    let mut x = vec![0.0; TOTAL_NUM_POINTS];
+    let mut y = vec![0.0; TOTAL_NUM_POINTS];
 
-//     let mut x = vec![0.0; 400];
-//     let mut y = vec![0.0; 400];
-//     for i in 0..400 {
-//         let angle =  (i as f32) * 2.0 * std::f32::consts::PI / 399.0;
-//         x[i] = (BIG_R + SMALL_R) * angle.cos() + D * ((BIG_R + SMALL_R) / SMALL_R * angle).cos();
-//         y[i] = (BIG_R + SMALL_R) * angle.sin() + D * ((BIG_R + SMALL_R) / SMALL_R * angle).sin();
-//     }
-//     (x, y)
-// }
+    match example {
+        0 => {
+            // Epitrochoid (original example)
+            const BIG_R: f32 = 5.0;
+            const SMALL_R: f32 = 1.0;
+            const D: f32 = 2.0;
+
+            for i in 0..TOTAL_NUM_POINTS {
+                let angle = (i as f32) * 2.0 * std::f32::consts::PI / (TOTAL_NUM_POINTS - 1) as f32;
+                x[i] = (BIG_R + SMALL_R) * angle.cos() + D * ((BIG_R + SMALL_R) / SMALL_R * angle).cos();
+                y[i] = (BIG_R + SMALL_R) * angle.sin() + D * ((BIG_R + SMALL_R) / SMALL_R * angle).sin();
+            }
+        },
+        1 => {
+            // Rose curve with multiple harmonics
+            for i in 0..TOTAL_NUM_POINTS {
+                let t = (i as f32) * std::f32::consts::PI / (TOTAL_NUM_POINTS - 1) as f32;
+                let r = 3.0 * (3.0 * t).cos() + 1.0 * (9.0 * t).cos() + 0.5 * (15.0 * t).cos();
+                x[i] = r * t.cos();
+                y[i] = r * t.sin();
+            }
+        },
+        2 => {
+            // Lissajous curve with frequency ratio 3:5 + harmonics
+            for i in 0..TOTAL_NUM_POINTS {
+                let t = (i as f32) * 2.0 * std::f32::consts::PI / (TOTAL_NUM_POINTS - 1) as f32;
+                let phase_shift = std::f32::consts::PI / 4.0;
+
+                // Main frequencies
+                x[i] = 4.0 * (3.0 * t).sin() + 1.5 * (6.0 * t).sin() + 0.8 * (9.0 * t).sin();
+                y[i] = 3.0 * (5.0 * t + phase_shift).sin() + 1.2 * (10.0 * t).sin() + 0.6 * (15.0 * t).sin();
+            }
+        },
+        3 => {
+            // Spirograph-like pattern with multiple frequencies
+            for i in 0..TOTAL_NUM_POINTS {
+                let t = (i as f32) * 2.0 * std::f32::consts::PI / (TOTAL_NUM_POINTS - 1) as f32;
+
+                // Complex combination of circular motions
+                x[i] = 3.0 * t.cos() + 2.0 * (2.0 * t).cos() + 1.0 * (4.0 * t).cos() + 0.5 * (7.0 * t).cos();
+                y[i] = 3.0 * t.sin() + 2.0 * (2.0 * t).sin() + 1.0 * (4.0 * t).sin() + 0.5 * (7.0 * t).sin();
+            }
+        },
+        _ => {
+           console::error(format!("Unknown example code: {}", example).as_str());
+        }
+    }
+
+    (x, y)
+}
 
 
-// fn init_animation_on_canvas(k_min: usize, k_max: usize) {
-//     let (x, y) = crate::gen_cyclic_function();
-//     match animation::Fourier::new(x, y, k_min, k_max) {
-//         Ok(mut var) => {
-//             var.start();
-//             ANIMATION.with(|cell| { *cell.borrow_mut() = Some(var); });
-//         },
-//         Err(msg) => {
-//             console::error(&format!("Failed to create Fourier animation: {}", msg));
-//             ANIMATION.with(|cell| { *cell.borrow_mut() = None; });
-//         }
-//     }
-// }
+fn init_animation_on_canvas(k_min: usize, k_max: usize, example_code: usize) {
+    let (x, y) = gen_animation_function(example_code);
+
+    // Create Fourier transforms once
+    match math::Fourier::new(x) {
+        Ok(fourier_x) => {
+            match math::Fourier::new(y) {
+                Ok(fourier_y) => {
+                    // Plot the frequency spectrum histogram once during initialization
+                    let power_x = fourier_x.power_spectrum();
+                    let power_y = fourier_y.power_spectrum();
+
+                    // Combine X and Y power spectra
+                    let combined_power: Vec<f32> = power_x.iter()
+                        .zip(power_y.iter())
+                        .map(|(px, py)| px + py)
+                        .collect();
+
+                    let n = combined_power.len();
+                    let freq: Vec<f32> = (0..n).map(|k| k as f32).collect();
+
+                    // Plot the spectrum histogram
+                    let spectrum_plt = plotter::Plotter::get_or_create("animation-spectrum-canvas");
+                    spectrum_plt.set_x_range(-5.0, freq.len() as f32 / 3.0);
+                    if let Err(msg) = spectrum_plt.plot_histogram(&freq, &combined_power, canvas::TAB_GREEN, 1.0) {
+                        console::error(&format!("Error plotting animation spectrum: {}", msg));
+                    } else {
+                        spectrum_plt.show();
+                    }
+
+                    // Create and start the animation using the same Fourier transforms
+                    match animation::Fourier::from_fourier(fourier_x, fourier_y, k_min, k_max) {
+                        Ok(mut var) => {
+                            var.start();
+                            animation::set_animation(var);
+                        },
+                        Err(msg) => {
+                            console::error(&format!("Failed to create Fourier animation: {}", msg));
+                            animation::clear_animation();
+                        }
+                    }
+                },
+                Err(msg) => {
+                    console::error(&format!("Failed to create Y Fourier for spectrum: {}", msg));
+                    animation::clear_animation();
+                }
+            }
+        },
+        Err(msg) => {
+            console::error(&format!("Failed to create X Fourier for spectrum: {}", msg));
+            animation::clear_animation();
+        }
+    }
+}
 
 
-// #[no_mangle]
-// pub fn step_animation() {
-//     ANIMATION.with(|cell| {
-//         if let Some(ref mut var) = *cell.borrow_mut() { var.step(); }
-//     });
-// }
+#[no_mangle]
+pub fn play_pause_animation(k_min: usize, k_max: usize, example_code: usize) {
+    animation::play_pause_animation(k_min, k_max, example_code, init_animation_on_canvas);
+}
 
-// #[no_mangle]
-// pub fn play_pause_animation(k_min: usize, k_max: usize) {
-//     ANIMATION.with(|cell| {
-//         let mut borrow = cell.borrow_mut();
-//         if let Some(ref mut var) = *borrow {
-//             if var.is_stopped() {
-//                 drop(borrow);
-//                 init_animation_on_canvas(k_min, k_max);
-//             } else if var.is_paused() {
-//                 var.play();
-//             } else if var.speed() > 1.0 || var.speed() < 1.0 {
-//                 var.set_speed(1.0);
-//             } else {
-//                 var.pause();
-//             }
-//         } else {
-//             drop(borrow);
-//             init_animation_on_canvas(k_min, k_max);
-//         }
-//     });
-// }
+#[no_mangle]
+pub fn stop_animation() {
+    animation::stop_animation();
+}
 
-// #[no_mangle]
-// pub fn stop_animation() {
-//     ANIMATION.with(|cell| {
-//         if let Some(ref mut var) = *cell.borrow_mut() {
-//             var.stop();
-//         }
-//     });
-// }
+#[no_mangle]
+pub fn increase_animation_speed() {
+    animation::increase_animation_speed();
+}
 
-// #[no_mangle]
-// pub fn increase_animation_speed() {
-//     ANIMATION.with(|cell| {
-//         if let Some(ref mut var) = *cell.borrow_mut() {
-//             var.set_speed(var.speed() + 0.5);
-//         }
-//     });
-// }
-
-// #[no_mangle]
-// pub fn decrease_animation_speed() {
-//     ANIMATION.with(|cell| {
-//         if let Some(ref mut var) = *cell.borrow_mut() {
-//             var.set_speed(var.speed() - 0.5);
-//         }
-//     });
-// }
+#[no_mangle]
+pub fn decrease_animation_speed() {
+    animation::decrease_animation_speed();
+}
