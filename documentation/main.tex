@@ -58,6 +58,8 @@ When we compute $F(\omega)$, we obtain:
     \item \textbf{Phase} $\arg(F(\omega))$: represents the phase shift of that frequency component
 \end{itemize}
 
+The squared magnitude $|F(\omega)|^2$ is called the \textbf{power spectrum} of the signal. It describes how the energy of the signal is distributed among different frequencies. Peaks in the power spectrum indicate dominant frequencies present in the original signal. The power spectrum is a fundamental tool in signal analysis, audio and image processing, and many areas of physics and engineering.
+
 \subsection{Key Properties}
 
 \subsubsection{Linearity}
@@ -103,6 +105,8 @@ The inverse DFT (IDFT) is:
 x[n] = \frac{1}{N} \sum_{k=0}^{N-1} X[k] e^{i 2\pi k n / N}
 \end{equation}
 
+The power spectrum for discrete signals is computed as $P[k] = |X[k]|^2$, where $X[k]$ is the DFT of $x[n]$. This quantity shows the energy content at each frequency bin $k$ and is widely used to analyze the frequency characteristics of digital signals.
+
 \subsection{Frequency Interpretation}
 
 The DFT computes the spectrum at $N$ equally spaced frequency points:
@@ -123,6 +127,29 @@ f_k = \frac{k f_s}{N}, \quad k = 0, 1, \ldots, N-1
     \item \textbf{Sampling}: The frequency domain is also sampled (quantized)
 \end{itemize}
 
+\subsection{Windowing}
+
+When applying the DFT to finite-length signals, edge effects can cause spectral leakage. Windowing functions (Hamming, Hanning, Blackman) are applied to mitigate these effects:
+
+\begin{equation}
+x_w[n] = x[n] \cdot w[n]
+\end{equation}
+
+where $w[n]$ is the window function.
+
+\subsection{Zero-Padding}
+
+Zero-padding increases frequency resolution and can improve the appearance of the spectrum:
+
+\begin{equation}
+x_{padded}[n] = \begin{cases}
+x[n] & \text{if } 0 \leq n < N \\
+0 & \text{if } N \leq n < M
+\end{cases}
+\end{equation}
+
+where $M > N$ is the new length.
+
 \subsection{Matrix Representation}
 
 The DFT can be written as a matrix multiplication:
@@ -137,7 +164,128 @@ where $\mathbf{W}_N$ is the $N \times N$ DFT matrix with elements:
 
 Direct computation requires $O(N^2)$ complex multiplications.
 
+\section{Fourier Transform for Parametrized Curves}
+
+\subsection{Introduction}
+
+For a parametrized curve $[x(t), y(t)]$, there are two common approaches to Fourier analysis:
+\begin{itemize}
+    \item \textbf{Component-wise:} Apply the Fourier Transform separately to $x(t)$ and $y(t)$.
+    \item \textbf{Complex signal:} Combine the components into a single complex signal $z(t) = x(t) + i y(t)$ and analyze $z(t)$.
+\end{itemize}
+Both approaches are useful and reveal different aspects of the curve's frequency content.
+
+\subsection{Definition}
+
+\textbf{Component-wise:}
+\begin{align}
+X(\omega) &= \int_{-\infty}^{\infty} x(t) e^{-i\omega t} dt \\
+Y(\omega) &= \int_{-\infty}^{\infty} y(t) e^{-i\omega t} dt
+\end{align}
+
+\textbf{Complex signal:}
+\begin{equation}
+Z(\omega) = \int_{-\infty}^{\infty} [x(t) + i y(t)] e^{-i\omega t} dt
+\end{equation}
+
+\subsection{Reconstruction}
+
+\textbf{Component-wise:}
+\begin{align}
+x(t) &= \frac{1}{2\pi} \int_{-\infty}^{\infty} X(\omega) e^{i\omega t} d\omega \\
+y(t) &= \frac{1}{2\pi} \int_{-\infty}^{\infty} Y(\omega) e^{i\omega t} d\omega
+\end{align}
+
+\textbf{Complex signal:}
+\begin{equation}
+z(t) = \frac{1}{2\pi} \int_{-\infty}^{\infty} Z(\omega) e^{i\omega t} d\omega
+\end{equation}
+where $z(t) = x(t) + i y(t)$.
+
+\subsection{Power Spectrum}
+
+For either approach, the power spectrum is given by the squared magnitude of the transform:
+\begin{itemize}
+    \item \textbf{Component-wise:} $|X(\omega)|^2$ and $|Y(\omega)|^2$ (can be summed for total power).
+    \item \textbf{Complex signal:} $|Z(\omega)|^2$ (includes cross-terms and phase relationships).
+\end{itemize}
+
+\subsection{Applications}
+
+Fourier analysis of parametrized curves is useful in:
+\begin{itemize}
+    \item \textbf{Shape Analysis}: Decomposing shapes into frequency components for comparison or recognition.
+    \item \textbf{Motion Analysis}: Analyzing trajectories in terms of their frequency content.
+    \item \textbf{Signal Processing}: Studying periodic patterns in two-dimensional data.
+\end{itemize}
+
+\subsection{Examples}
+
+\textbf{Circle:} $x(t) = \cos(t)$, $y(t) = \sin(t)$. As a complex signal, $z(t) = e^{it}$, whose Fourier Transform has a single frequency component.
+
+\textbf{Lissajous Curve:}
+\begin{align}
+x(t) &= \cos(2t) \\
+y(t) &= \sin(3t)
+\end{align}
+Component-wise, the spectra have peaks at frequencies $2$ and $3$. As a complex signal, $z(t) = \cos(2t) + i\sin(3t)$, the spectrum reflects both frequencies and their phase relationship.
+
+\subsection{Choosing an Approach}
+
+Treating $x(t)$ and $y(t)$ separately is simple and useful when the components are independent. The complex approach is powerful for capturing phase relationships and correlations, and is often used in shape and motion analysis. Comparing both the individual and complex spectra can provide deeper insight into the structure and dynamics of the curve.
+
+\section{The Two-Dimensional Fourier Transform}
+
+The two-dimensional (2D) Fourier Transform is a natural extension of the 1D case and is widely used in fields such as image processing, optics, and data analysis. It allows us to analyze the frequency content of functions defined over a plane, such as images or spatial data.
+
+\subsection{Definition}
+
+Given a function $f(x, y)$ defined over $\mathbb{R}^2$, the 2D continuous Fourier Transform is defined as:
+\begin{equation}
+F(u, v) = \iint_{-\infty}^{\infty} f(x, y) e^{-i(ux + vy)} dx dy
+\end{equation}
+where $(u, v)$ are the frequency variables corresponding to the $x$ and $y$ directions.
+
+The inverse 2D Fourier Transform is:
+\begin{equation}
+f(x, y) = \frac{1}{(2\pi)^2} \iint_{-\infty}^{\infty} F(u, v) e^{i(ux + vy)} du dv
+\end{equation}
+
+For discrete data (such as digital images), the 2D Discrete Fourier Transform (DFT) is:
+\begin{equation}
+F[k, l] = \sum_{m=0}^{M-1} \sum_{n=0}^{N-1} f[m, n] e^{-i 2\pi (\frac{km}{M} + \frac{ln}{N})}
+\end{equation}
+where $f[m, n]$ is the value at pixel $(m, n)$ and $F[k, l]$ is the frequency component at $(k, l)$.
+
+\subsection{Properties and Interpretation}
+
+The 2D Fourier Transform decomposes a function into its spatial frequency components. Each point in the frequency domain represents a particular combination of horizontal and vertical frequencies. The magnitude $|F(u, v)|$ indicates the strength of that frequency, while the phase encodes spatial alignment.
+
+\subsection{Applications}
+
+\begin{itemize}
+    \item \textbf{Image Processing}: Filtering, denoising, edge detection, and image compression (e.g., JPEG uses the 2D DCT, a close relative of the 2D FT).
+    \item \textbf{Pattern Recognition}: Identifying repeating structures or textures in images.
+    \item \textbf{Optics}: Analyzing diffraction patterns and lens systems.
+    \item \textbf{Data Analysis}: Studying spatial correlations in 2D datasets (e.g., geophysics, astronomy).
+\end{itemize}
+
+\subsection{Example: Image Filtering}
+
+A common use of the 2D Fourier Transform is to filter images. For example, a low-pass filter can be applied in the frequency domain to remove high-frequency noise, resulting in a smoother image. Conversely, a high-pass filter can enhance edges and fine details.
+
+\textbf{Steps:}
+\begin{enumerate}
+    \item Compute the 2D DFT of the image.
+    \item Modify the frequency components (e.g., set high frequencies to zero for low-pass filtering).
+    \item Compute the inverse 2D DFT to obtain the filtered image.
+\end{enumerate}
+
+The 2D Fourier Transform is a powerful tool for understanding and manipulating spatial data, and forms the mathematical foundation for many modern imaging techniques.
+
 \section{The Fast Fourier Transform (FFT)}
+
+The Fast Fourier Transform (FFT) is a family of algorithms for efficiently computing the Discrete Fourier Transform (DFT) and its inverse. While the DFT provides the mathematical foundation for frequency analysis of discrete signals, the FFT makes it practical to compute the DFT for large datasets by reducing the computational complexity from $O(N^2)$ to $O(N \log N)$. Understanding the FFT is not required for grasping the core ideas of Fourier analysis, but it is essential for real-world applications.
 
 \subsection{The Computational Challenge}
 
@@ -254,40 +402,30 @@ Decimal & Binary & Bit-Reversed & New Position \\
 \end{tabular}
 \end{center}
 
-\section{Applications and Practical Considerations}
+\subsection{The 2D Fast Fourier Transform}
 
-\subsection{Common Applications}
+The Fast Fourier Transform can also be extended to two dimensions, making it possible to efficiently compute the 2D DFT of images and other 2D data. The 2D FFT works by applying the 1D FFT algorithm first along one axis (e.g., rows) and then along the other axis (e.g., columns). This reduces the computational complexity from $O(N^2 M^2)$ to $O(NM \log(NM))$ for an $N \times M$ array.
 
-\begin{itemize}
-    \item \textbf{Digital Signal Processing}: Filtering, spectral analysis
-    \item \textbf{Image Processing}: Compression (JPEG), enhancement
-    \item \textbf{Audio Processing}: Music analysis, noise reduction
-    \item \textbf{Communications}: Modulation schemes (OFDM)
-    \item \textbf{Scientific Computing}: Solving PDEs, convolution
-\end{itemize}
-
-\subsection{Windowing}
-
-When applying the DFT to finite-length signals, edge effects can cause spectral leakage. Windowing functions (Hamming, Hanning, Blackman) are applied to mitigate these effects:
-
+Mathematically, for a 2D array $f[m, n]$ of size $M \times N$, the 2D DFT is:
 \begin{equation}
-x_w[n] = x[n] \cdot w[n]
+F[k, l] = \sum_{m=0}^{M-1} \sum_{n=0}^{N-1} f[m, n] e^{-i 2\pi (\frac{km}{M} + \frac{ln}{N})}
 \end{equation}
 
-where $w[n]$ is the window function.
+The 2D FFT computes this efficiently by:
+\begin{enumerate}
+    \item Applying the 1D FFT to each row:
+    \begin{equation}
+    f'[m, l] = \sum_{n=0}^{N-1} f[m, n] e^{-i 2\pi \frac{ln}{N}}
+    \end{equation}
+    \item Then applying the 1D FFT to each column of the result:
+    \begin{equation}
+    F[k, l] = \sum_{m=0}^{M-1} f'[m, l] e^{-i 2\pi \frac{km}{M}}
+    \end{equation}
+\end{enumerate}
 
-\subsection{Zero-Padding}
+The same process can be used for the inverse 2D FFT, applying the inverse 1D FFT along columns and then rows.
 
-Zero-padding increases frequency resolution and can improve the appearance of the spectrum:
-
-\begin{equation}
-x_{padded}[n] = \begin{cases}
-x[n] & \text{if } 0 \leq n < N \\
-0 & \text{if } N \leq n < M
-\end{cases}
-\end{equation}
-
-where $M > N$ is the new length.
+The 2D FFT is widely used in image processing for filtering, compression, and feature extraction, as well as in scientific computing and data analysis involving spatial data.
 
 \section{Conclusion}
 
@@ -301,6 +439,12 @@ The FFT's $O(N \log N)$ complexity has made real-time spectral analysis possible
     \item Cooley, J. W., \& Tukey, J. W. (1965). An algorithm for the machine calculation of complex Fourier series. Mathematics of Computation, 19(90), 297-301.
     \item Oppenheim, A. V., \& Schafer, R. W. (2009). Discrete-time signal processing. Pearson.
     \item Brigham, E. O. (1988). The fast Fourier transform and its applications. Prentice Hall.
+    \item Gonzalez, R. C., \& Woods, R. E. (2018). Digital Image Processing (4th Edition). Pearson.
+    \item Bracewell, R. N. (2000). The Fourier Transform and Its Applications (3rd Edition). McGraw-Hill.
+    \item Harris, F. J. (1978). On the use of windows for harmonic analysis with the discrete Fourier transform. Proceedings of the IEEE, 66(1), 51-83.
+    \item Smith, S. W. (1997). The Scientist and Engineer's Guide to Digital Signal Processing. California Technical Publishing.
 \end{itemize}
 
+
 \end{document}
+
