@@ -60,6 +60,16 @@ When we compute $F(\omega)$, we obtain:
 
 The squared magnitude $|F(\omega)|^2$ is called the \textbf{power spectrum} of the signal. It describes how the energy of the signal is distributed among different frequencies. Peaks in the power spectrum indicate dominant frequencies present in the original signal. The power spectrum is a fundamental tool in signal analysis, audio and image processing, and many areas of physics and engineering.
 
+\subsection{Symmetry for Real-Valued Functions}
+
+If $f(t)$ is real-valued, its Fourier Transform $F(\omega)$ satisfies the Hermitian symmetry property:
+\begin{equation}
+F(-\omega) = F^*(\omega)
+\end{equation}
+where $F^*$ denotes the complex conjugate. This means the negative frequency components are redundant and determined by the positive frequencies. As a result, the full frequency content of a real signal is captured by the spectrum for $\omega \geq 0$, and the real and imaginary parts of $F(\omega)$ correspond to the amplitudes of cosine and sine components, respectively.
+
+This symmetry is fundamental for interpreting the spectrum of real signals and is analogous to the discrete case. In particular, the real part of $F(\omega)$ for $\omega > 0$ is doubled in the reconstruction of $f(t)$, since the contributions from $+\omega$ and $-\omega$ add together. Thus, the amplitude at each positive frequency is often interpreted as $2\operatorname{Re}[F(\omega)]$ (or $2|F(\omega)|$ for the magnitude spectrum), reflecting the combined effect of both positive and negative frequencies.
+
 \subsection{Key Properties}
 
 \subsubsection{Linearity}
@@ -118,6 +128,18 @@ If the sampling rate is $f_s$, then the actual frequencies are:
 \begin{equation}
 f_k = \frac{k f_s}{N}, \quad k = 0, 1, \ldots, N-1
 \end{equation}
+
+\subsection{Symmetry for Real Signals}
+
+When the input signal $x[n]$ is real-valued, the DFT exhibits a special symmetry known as Hermitian symmetry:
+\begin{equation}
+X[k] = X^*[N - k]
+\end{equation}
+where $X^*$ denotes the complex conjugate and $N$ is the total number of points. This means the spectrum is redundant for negative frequencies, and the information for $k$ and $N-k$ is related.
+
+As a result, the DFT of a real signal can be fully described by the coefficients for $k = 0$ to $N/2$ (for even $N$). The real part of $X[k]$ gives the amplitude of the cosine component at frequency $k$, and the imaginary part gives the amplitude of the sine component. The magnitude spectrum is often plotted as $2|X[k]|$ for $k > 0$ to account for the energy shared between positive and negative frequencies.
+
+This symmetry is important for interpreting the frequency content of real-world signals (such as audio, images, and measurements), and is exploited in many FFT implementations to save computation and storage.
 
 \subsection{Key Differences from CFT}
 
