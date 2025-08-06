@@ -40,7 +40,7 @@ fn generate_cache(kind: u32) -> ExampleCache {
         x.push(generator(ti, i));
     }
 
-    let fourier = match math::Fourier::new(x) {
+    let fourier = match math::Fourier::from_real(x) {
         Ok(fourier) => fourier,
         Err(msg) => {
             console::error(&format!("Failed to create Fourier instance: {}", msg));
@@ -58,11 +58,15 @@ fn plot_cached_example(k_min: usize, k_max: usize, cache: &mut ExampleCache) {
         Err(msg) => { console::error(&format!("Error filtering: {}", msg)); return; }
     };
 
-    if let Err(msg) = plt.plot_line(&cache.t, cache.fourier.original(), canvas::TAB_BLUE, 2.0) {
+    // Extract real parts for plotting
+    let original_real: Vec<f32> = cache.fourier.original().iter().map(|c| c.re).collect();
+    let filtered_real: Vec<f32> = filtered.iter().map(|c| c.re).collect();
+
+    if let Err(msg) = plt.plot_line(&cache.t, &original_real, canvas::TAB_BLUE, 2.0) {
         console::error(&format!("Error plotting function: {}", msg));
         return;
     }
-    if let Err(msg) = plt.plot_line(&cache.t, &filtered, canvas::TAB_ORANGE, 2.0) {
+    if let Err(msg) = plt.plot_line(&cache.t, &filtered_real, canvas::TAB_ORANGE, 2.0) {
         console::error(&format!("Error plotting filtered: {}", msg));
         return;
     }
@@ -76,7 +80,6 @@ fn plot_cached_spectrum(cache: &mut ExampleCache) {
     let freq: Vec<f32> = (0..n).map(|k| k as f32).collect();
 
     let plt = plotter::Plotter::get_or_create("spectrum-canvas");
-    plt.set_x_range(-5.0, freq.len() as f32 / 3.0);
     if let Err(msg) = plt.plot_histogram(&freq, &power, canvas::TAB_GREEN, 1.0) {
         console::error(&format!("Error plotting power spectrum: {}", msg));
         return;
@@ -168,53 +171,42 @@ fn gen_animation_function(example: usize) -> (Vec<f32>, Vec<f32>) {
 fn init_animation_on_canvas(k_min: usize, k_max: usize, example_code: usize) {
     let (x, y) = gen_animation_function(example_code);
 
+    // Convert x,y to a single vector of complex numbers
+    let data = x.iter().zip(y.iter())
+        .map(|(&re, &im)| math::Complex32::new(re, im))
+        .collect::<Vec<_>>();
+
     // Create Fourier transforms once
-    match math::Fourier::new(x) {
-        Ok(fourier_x) => {
-            match math::Fourier::new(y) {
-                Ok(fourier_y) => {
-                    // Plot the frequency spectrum histogram once during initialization
-                    let power_x = fourier_x.power_spectrum();
-                    let power_y = fourier_y.power_spectrum();
+    match math::Fourier::from_complex(data) {
+        Ok(fourier) => {
+            // Plot the frequency spectrum histogram once during initialization
+            let power = fourier.power_spectrum();
 
-                    // Combine X and Y power spectra
-                    let combined_power: Vec<f32> = power_x.iter()
-                        .zip(power_y.iter())
-                        .map(|(px, py)| px + py)
-                        .collect();
+            let n = power.len();
+            let freq: Vec<f32> = (0..n).map(|k| k as f32).collect();
 
-                    let n = combined_power.len();
-                    let freq: Vec<f32> = (0..n).map(|k| k as f32).collect();
+            // Plot the spectrum histogram
+            let spectrum_plt = plotter::Plotter::get_or_create("animation-spectrum-canvas");
+            if let Err(msg) = spectrum_plt.plot_histogram(&freq, &power, canvas::TAB_GREEN, 1.0) {
+                console::error(&format!("Error plotting animation spectrum: {}", msg));
+            } else {
+                spectrum_plt.show();
+            }
 
-                    // Plot the spectrum histogram
-                    let spectrum_plt = plotter::Plotter::get_or_create("animation-spectrum-canvas");
-                    spectrum_plt.set_x_range(-5.0, freq.len() as f32 / 3.0);
-                    if let Err(msg) = spectrum_plt.plot_histogram(&freq, &combined_power, canvas::TAB_GREEN, 1.0) {
-                        console::error(&format!("Error plotting animation spectrum: {}", msg));
-                    } else {
-                        spectrum_plt.show();
-                    }
-
-                    // Create and start the animation using the same Fourier transforms
-                    match animation::Fourier::from_fourier(fourier_x, fourier_y, k_min, k_max) {
-                        Ok(mut var) => {
-                            var.start();
-                            animation::set_animation(var);
-                        },
-                        Err(msg) => {
-                            console::error(&format!("Failed to create Fourier animation: {}", msg));
-                            animation::clear_animation();
-                        }
-                    }
+            // Create and start the animation using the same Fourier transforms
+            match animation::Fourier::from_fourier(fourier, k_min, k_max) {
+                Ok(mut var) => {
+                    var.start();
+                    animation::set_animation(var);
                 },
                 Err(msg) => {
-                    console::error(&format!("Failed to create Y Fourier for spectrum: {}", msg));
+                    console::error(&format!("Failed to create Fourier animation: {}", msg));
                     animation::clear_animation();
                 }
             }
         },
         Err(msg) => {
-            console::error(&format!("Failed to create X Fourier for spectrum: {}", msg));
+            console::error(&format!("Failed to create Y Fourier for spectrum: {}", msg));
             animation::clear_animation();
         }
     }

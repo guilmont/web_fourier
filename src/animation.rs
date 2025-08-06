@@ -1,6 +1,8 @@
 use crate::math;
 use web_canvas::canvas;
+
 use std::cell::RefCell;
+use num_complex::Complex32;
 
 thread_local! {
     // Animation instance for the Fourier series visualization
@@ -36,8 +38,7 @@ impl Default for Viewport {
 
 pub struct Fourier {
     // Fourier data
-    fourier_x: math::Fourier,
-    fourier_y: math::Fourier,
+    fourier: math::Fourier, // Single Fourier transform where real=x, imag=y
     k_min: usize,
     k_max: usize,
 
@@ -75,9 +76,14 @@ impl Fourier {
         if x_data.len() != y_data.len() {
             return Err("X and Y data must have same length".into());
         }
+
+        // Convert x,y to complex numbers where x=real, y=imaginary
+        let complex_data: Vec<Complex32> = x_data.iter().zip(y_data.iter())
+            .map(|(&x, &y)| Complex32::new(x, y))
+            .collect();
+
         let fourier = Fourier {
-            fourier_x: math::Fourier::new(x_data)?,
-            fourier_y: math::Fourier::new(y_data)?,
+            fourier: math::Fourier::from_complex(complex_data)?,
             k_min,
             k_max,
             canvas: canvas::Canvas::from_element("animation-canvas"),
@@ -97,20 +103,15 @@ impl Fourier {
     /// This is more efficient when you already have the Fourier transforms.
     ///
     /// # Arguments
-    /// * `fourier_x` - Pre-computed Fourier transform for x-coordinates.
-    /// * `fourier_y` - Pre-computed Fourier transform for y-coordinates.
+    /// * `fourier` - Pre-computed Fourier transform for complex data (x=real, y=imaginary).
     /// * `k_min` - The minimum frequency to include in the Fourier series.
     /// * `k_max` - The maximum frequency to include in the Fourier series.
     ///
     /// # Returns
     /// A `Result` containing the `Fourier` instance or an error message.
-    pub fn from_fourier(fourier_x: math::Fourier, fourier_y: math::Fourier, k_min: usize, k_max: usize) -> Result<Self, String> {
-        if fourier_x.size() != fourier_y.size() {
-            return Err("X and Y Fourier transforms must have same size".into());
-        }
-        let fourier = Fourier {
-            fourier_x,
-            fourier_y,
+    pub fn from_fourier(fourier: math::Fourier, k_min: usize, k_max: usize) -> Result<Self, String> {
+        let fourier_struct = Fourier {
+            fourier,
             k_min,
             k_max,
             canvas: canvas::Canvas::from_element("animation-canvas"),
@@ -122,8 +123,8 @@ impl Fourier {
         };
 
         // Register the event handler - we'll handle animation frame calls
-        fourier.canvas.register_handler(AnimationEventHandler);
-        Ok(fourier)
+        fourier_struct.canvas.register_handler(AnimationEventHandler);
+        Ok(fourier_struct)
     }
 
     /// Start the self-contained animation loop
@@ -149,10 +150,10 @@ impl Fourier {
 
         self.current_point += self.point_speed;
         if self.current_point < 0.0 {
-            self.current_point = self.fourier_x.size() as f64;
+            self.current_point = self.fourier.size() as f64;
         }
 
-        let current_point = (self.fourier_x.size() + self.current_point as usize) % self.fourier_x.size();
+        let current_point = (self.fourier.size() + self.current_point as usize) % self.fourier.size();
 
         self.plot_all(current_point);
     }
@@ -183,8 +184,7 @@ impl Fourier {
     fn calculate_viewport(&mut self) {
         // Calculate center of mass from the original data
         // Since data is already centered in math::Fourier, we just need to find bounds
-        let x_data = self.fourier_x.original();
-        let y_data = self.fourier_y.original();
+        let complex_data = self.fourier.original();
 
         // Find bounds of all data (already centered)
         let mut x_min = f32::INFINITY;
@@ -192,14 +192,12 @@ impl Fourier {
         let mut y_min = f32::INFINITY;
         let mut y_max = f32::NEG_INFINITY;
 
-        // Check original data
-        for &x in x_data {
-            if x < x_min { x_min = x; }
-            if x > x_max { x_max = x; }
-        }
-        for &y in y_data {
-            if y < y_min { y_min = y; }
-            if y > y_max { y_max = y; }
+        // Check original data (x=real, y=imaginary)
+        for complex_val in complex_data {
+            if complex_val.re < x_min { x_min = complex_val.re; }
+            if complex_val.re > x_max { x_max = complex_val.re; }
+            if complex_val.im < y_min { y_min = complex_val.im; }
+            if complex_val.im > y_max { y_max = complex_val.im; }
         }
 
         // Check fourier component endpoints
@@ -207,17 +205,13 @@ impl Fourier {
         let mut current_x = 0.0;
         let mut current_y = 0.0;
         for k in k_min..=k_max {
-            if let (Ok(next_x), Ok(next_y)) = (
-                self.fourier_x.get_component(k, 0),
-                self.fourier_y.get_component(k, 0),
-            ) {
-                current_x += next_x;
-                current_y += next_y;
-                if current_x < x_min { x_min = current_x; }
-                if current_x > x_max { x_max = current_x; }
-                if current_y < y_min { y_min = current_y; }
-                if current_y > y_max { y_max = current_y; }
-            }
+            let component = self.fourier.get_component(k, 0);
+            current_x += component.re;
+            current_y += component.im;
+            if current_x < x_min { x_min = current_x; }
+            if current_x > x_max { x_max = current_x; }
+            if current_y < y_min { y_min = current_y; }
+            if current_y > y_max { y_max = current_y; }
         }
 
         // Add some padding
@@ -265,14 +259,14 @@ impl Fourier {
     /// Plot all components of the animation
     fn plot_all(&self, current_point: usize) {
         self.canvas.clear();
-        self.plot_dimensional_indicators(current_point);
+        self.plot_dimensional_indicators();
         self.plot_original_curve();
         self.plot_reconstructed_curve(current_point);
         self.plot_fourier_components(current_point);
     }
 
     /// Draw dimensional indicators like axes and scale markers
-    fn plot_dimensional_indicators(&self, current_point: usize) {
+    fn plot_dimensional_indicators(&self) {
         let canvas_width = self.canvas.width();
         let canvas_height = self.canvas.height();
 
@@ -333,29 +327,6 @@ impl Fourier {
             }
             y_val += y_interval;
         }
-
-        // Draw origin marker
-        if origin_x >= 0.0 && origin_x <= canvas_width && origin_y >= 0.0 && origin_y <= canvas_height {
-            self.canvas.fill_circle(origin_x, origin_y, 2.0, canvas::BLACK);
-        }
-
-        // Draw current point indicator
-        let (k_min, k_max) = self.clamped_frequency_range();
-        let mut tip_x = 0.0;
-        let mut tip_y = 0.0;
-        for k in k_min..=k_max {
-            if let (Ok(next_x), Ok(next_y)) = (
-                self.fourier_x.get_component(k, current_point),
-                self.fourier_y.get_component(k, current_point),
-            ) {
-                tip_x += next_x;
-                tip_y += next_y;
-            }
-        }
-        let (tip_px, tip_py) = self.viewport_to_canvas(tip_x, tip_y);
-        if tip_px >= 0.0 && tip_px <= canvas_width && tip_py >= 0.0 && tip_py <= canvas_height {
-            self.canvas.fill_circle(tip_px, tip_py, 3.0, canvas::TAB_RED);
-        }
     }
 
     /// Calculate a "nice" interval for scale markings
@@ -378,17 +349,16 @@ impl Fourier {
 
     /// Plots the original curve on the canvas.
     fn plot_original_curve(&self) {
-        let x_orig = self.fourier_x.original();
-        let y_orig = self.fourier_y.original();
+        let complex_orig = self.fourier.original();
 
-        if x_orig.len() < 2 { return; }
+        if complex_orig.len() < 2 { return; }
 
-        let mut x_pixels = Vec::with_capacity(x_orig.len());
-        let mut y_pixels = Vec::with_capacity(y_orig.len());
+        let mut x_pixels = Vec::with_capacity(complex_orig.len());
+        let mut y_pixels = Vec::with_capacity(complex_orig.len());
 
-        for i in 0..x_orig.len() {
-            // Data is already centered in math::Fourier
-            let (x_px, y_px) = self.viewport_to_canvas(x_orig[i], y_orig[i]);
+        for complex_val in complex_orig {
+            // Extract x (real) and y (imaginary) parts
+            let (x_px, y_px) = self.viewport_to_canvas(complex_val.re, complex_val.im);
             x_pixels.push(x_px);
             y_pixels.push(y_px);
         }
@@ -399,18 +369,17 @@ impl Fourier {
     /// Plots the reconstructed curve up to the current frequency on the canvas.
     fn plot_reconstructed_curve(&self, current_point: usize) {
         let (k_min, k_max) = self.clamped_frequency_range();
-        let recon_x = self.fourier_x.filtered_range(k_min, k_max).unwrap_or_else(|_| vec![0.0; self.fourier_x.size()]);
-        let recon_y = self.fourier_y.filtered_range(k_min, k_max).unwrap_or_else(|_| vec![0.0; self.fourier_y.size()]);
+        let recon_complex = self.fourier.filtered_range(k_min, k_max).unwrap_or_else(|_| vec![Complex32::new(0.0, 0.0); self.fourier.size()]);
 
-        if current_point < 2 || recon_x.len() < 2 { return; }
+        if current_point < 2 || recon_complex.len() < 2 { return; }
 
-        let end_point = (current_point + 1).min(recon_x.len());
+        let end_point = (current_point + 1).min(recon_complex.len());
         let mut x_pixels = Vec::with_capacity(end_point);
         let mut y_pixels = Vec::with_capacity(end_point);
 
         for i in 0..end_point {
-            // Data is already centered in math::Fourier
-            let (x_px, y_px) = self.viewport_to_canvas(recon_x[i], recon_y[i]);
+            // Extract x (real) and y (imaginary) parts
+            let (x_px, y_px) = self.viewport_to_canvas(recon_complex[i].re, recon_complex[i].im);
             x_pixels.push(x_px);
             y_pixels.push(y_px);
         }
@@ -420,32 +389,43 @@ impl Fourier {
 
     /// Plots the Fourier components as vectors on the canvas.
     fn plot_fourier_components(&self, current_point: usize) {
-        let mut current_x = 0.0; // Data is already centered
-        let mut current_y = 0.0;
+        let mut current_complex = Complex32::new(0.0, 0.0);
         let (k_min, k_max) = self.clamped_frequency_range();
+        let total_points = self.fourier.size();
 
+        // Draw positive frequencies (including DC)
         for k in k_min..=k_max {
-            if let (Ok(next_x), Ok(next_y)) = (
-                self.fourier_x.get_component(k, current_point),
-                self.fourier_y.get_component(k, current_point),
-            ) {
-                let next_x = current_x + next_x;
-                let next_y = current_y + next_y;
+            let component = self.fourier.get_component(k, current_point);
+            let next_complex = current_complex + component;
+            let (start_px, start_py) = self.viewport_to_canvas(current_complex.re, current_complex.im);
+            let (end_px, end_py) = self.viewport_to_canvas(next_complex.re, next_complex.im);
+            self.canvas.draw_arrow(start_px, start_py, end_px, end_py, ARROW_WIDTH, canvas::TAB_GREEN);
+            current_complex = next_complex;
 
-                let (start_px, start_py) = self.viewport_to_canvas(current_x, current_y);
-                let (end_px, end_py) = self.viewport_to_canvas(next_x, next_y);
+            // skip DC for negative frequencies
+            if k == 0 { continue; }
 
-                self.canvas.draw_arrow(start_px, start_py, end_px, end_py, ARROW_WIDTH, canvas::TAB_GREEN);
-
-                current_x = next_x;
-                current_y = next_y;
-            }
+            // For negative frequency, use conjugate and negative angle
+            let component = self.fourier.get_component(total_points - k, current_point);
+            let next_complex = current_complex + component;
+            let (start_px, start_py) = self.viewport_to_canvas(current_complex.re, current_complex.im);
+            let (end_px, end_py) = self.viewport_to_canvas(next_complex.re, next_complex.im);
+            self.canvas.draw_arrow(start_px, start_py, end_px, end_py, ARROW_WIDTH, canvas::TAB_OLIVE);
+            current_complex = next_complex;
         }
+
+
+        // Draw origin marker
+        let (origin_x, origin_y) = self.viewport_to_canvas(0.0, 0.0);
+        self.canvas.fill_circle(origin_x, origin_y, 2.0, canvas::BLACK);
+        // Draw current point indicator
+        let (tip_px, tip_py) = self.viewport_to_canvas(current_complex.re, current_complex.im);
+        self.canvas.fill_circle(tip_px, tip_py, 3.0, canvas::TAB_RED);
     }
 
     /// Returns the clamped frequency range (k_min, k_max) based on the maximum frequency.
     fn clamped_frequency_range(&self) -> (usize, usize) {
-        let max_k = self.fourier_x.max_frequency();
+        let max_k = self.fourier.max_frequency();
         let k_min = if self.k_min > max_k { max_k } else { self.k_min };
         let k_max = if self.k_max > max_k { max_k } else { self.k_max };
         (k_min, k_max)

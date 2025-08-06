@@ -148,7 +148,7 @@ impl Plotter {
                 if x > x_max { x_max = x; }
             }
             let range = x_max - x_min;
-            self.set_x_range(x_min - 0.1 * range, x_max + 0.1 * range);
+            self.set_x_range(x_min - 0.1 * range, x_max + 0.01 * range);
         }
 
         if self.viewport.y_auto {
