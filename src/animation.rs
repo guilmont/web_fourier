@@ -1,5 +1,6 @@
 use crate::math;
 use web_canvas::canvas;
+use web_canvas::console;
 
 use std::cell::RefCell;
 use num_complex::Complex32;
@@ -14,6 +15,7 @@ thread_local! {
 const LINE_WIDTH_ORIGINAL: f32 = 1.0;
 const LINE_WIDTH_RECONSTRUCTED: f32 = 2.0;
 const ARROW_WIDTH: f32 = 2.0;
+const DEFAULT_SPEED: f64 = 50.0; // points per second at 60 FPS
 
 #[derive(Clone)]
 struct Viewport {
@@ -82,21 +84,9 @@ impl Fourier {
             .map(|(&x, &y)| Complex32::new(x, y))
             .collect();
 
-        let fourier = Fourier {
-            fourier: math::Fourier::from_complex(complex_data)?,
-            k_min,
-            k_max,
-            canvas: canvas::Canvas::from_element("animation-canvas"),
-            current_point: 0.0,
-            point_speed: 1.0,
-            is_paused: true,
-            is_stopped: true,
-            viewport: Viewport::default(),
-        };
-
-        // Register the event handler - we'll handle animation frame calls
-        fourier.canvas.register_handler(AnimationEventHandler);
-        Ok(fourier)
+        // Create Fourier transforms from complex data
+       let fourier =  math::Fourier::from_complex(complex_data)?;
+       Self::from_fourier(fourier, k_min, k_max)
     }
 
     /// Creates a new `Fourier` instance from pre-computed Fourier transforms.
@@ -116,7 +106,7 @@ impl Fourier {
             k_max,
             canvas: canvas::Canvas::from_element("animation-canvas"),
             current_point: 0.0,
-            point_speed: 1.0,
+            point_speed: DEFAULT_SPEED,
             is_paused: true,
             is_stopped: true,
             viewport: Viewport::default(),
@@ -144,11 +134,11 @@ impl Fourier {
     }
 
     /// Advances the animation by one step, updating the plot.
-    pub fn step(&mut self) {
+    pub fn step(&mut self, elapsed: f64) {
         // If not running, do nothing
         if self.is_paused { return; }
 
-        self.current_point += self.point_speed;
+        self.current_point += self.point_speed * elapsed;
         if self.current_point < 0.0 {
             self.current_point = self.fourier.size() as f64;
         }
@@ -200,24 +190,10 @@ impl Fourier {
             if complex_val.im > y_max { y_max = complex_val.im; }
         }
 
-        // Check fourier component endpoints
-        let (k_min, k_max) = self.clamped_frequency_range();
-        let mut current_x = 0.0;
-        let mut current_y = 0.0;
-        for k in k_min..=k_max {
-            let component = self.fourier.get_component(k, 0);
-            current_x += component.re;
-            current_y += component.im;
-            if current_x < x_min { x_min = current_x; }
-            if current_x > x_max { x_max = current_x; }
-            if current_y < y_min { y_min = current_y; }
-            if current_y > y_max { y_max = current_y; }
-        }
-
         // Add some padding
         let x_range = x_max - x_min;
         let y_range = y_max - y_min;
-        let padding = 0.1;
+        let padding = 0.15; // 15% padding
         x_min -= padding * x_range;
         x_max += padding * x_range;
         y_min -= padding * y_range;
@@ -258,6 +234,8 @@ impl Fourier {
 
     /// Plot all components of the animation
     fn plot_all(&self, current_point: usize) {
+        if !self.check_frequency_range() { return; }
+
         self.canvas.clear();
         self.plot_dimensional_indicators();
         self.plot_original_curve();
@@ -267,6 +245,8 @@ impl Fourier {
 
     /// Draw dimensional indicators like axes and scale markers
     fn plot_dimensional_indicators(&self) {
+        // Draw scale markers and labels
+        const FONT: &str = "10px monospace";
         let canvas_width = self.canvas.width();
         let canvas_height = self.canvas.height();
 
@@ -283,8 +263,6 @@ impl Fourier {
             self.canvas.draw_line(origin_x, 0.0, origin_x, canvas_height, 1.0, canvas::LIGHT_GRAY);
         }
 
-        // Draw scale markers and labels
-        let font = "10px monospace";
 
         // Calculate nice scale intervals
         let x_range = self.viewport.x_max - self.viewport.x_min;
@@ -304,8 +282,8 @@ impl Fourier {
                     self.canvas.draw_line(tick_x, tick_y - 3.0, tick_x, tick_y + 3.0, 1.0, canvas::DARK_GRAY);
                     // Draw label
                     let label = if x_val.abs() < 0.01 { "0".to_string() } else { format!("{:.1}", x_val) };
-                    let text_width = self.canvas.measure_text_width(&label, font);
-                    self.canvas.draw_text(&label, tick_x - text_width / 2.0, tick_y + 15.0, font, canvas::DARK_GRAY);
+                    let text_width = self.canvas.measure_text_width(&label, FONT);
+                    self.canvas.draw_text(&label, tick_x - text_width / 2.0, tick_y + 15.0, FONT, canvas::DARK_GRAY);
                 }
             }
             x_val += x_interval;
@@ -322,11 +300,24 @@ impl Fourier {
                     self.canvas.draw_line(tick_x - 3.0, tick_y, tick_x + 3.0, tick_y, 1.0, canvas::DARK_GRAY);
                     // Draw label
                     let label = if y_val.abs() < 0.01 { "0".to_string() } else { format!("{:.1}", y_val) };
-                    self.canvas.draw_text(&label, tick_x - 25.0, tick_y + 3.0, font, canvas::DARK_GRAY);
+                    self.canvas.draw_text(&label, tick_x - 25.0, tick_y + 3.0, FONT, canvas::DARK_GRAY);
                 }
             }
             y_val += y_interval;
         }
+    }
+
+    fn check_frequency_range(&self) -> bool {
+        let max_freq = self.fourier.max_frequency();
+        if self.k_min > self.k_max {
+            console::error("k_min cannot be greater than k_max");
+            return false;
+        }
+        if self.k_max > max_freq {
+            console::error(&format!("k_max cannot exceed maximum frequency: {}", max_freq));
+            return false;
+        }
+        true
     }
 
     /// Calculate a "nice" interval for scale markings
@@ -368,8 +359,7 @@ impl Fourier {
 
     /// Plots the reconstructed curve up to the current frequency on the canvas.
     fn plot_reconstructed_curve(&self, current_point: usize) {
-        let (k_min, k_max) = self.clamped_frequency_range();
-        let recon_complex = self.fourier.filtered_range(k_min, k_max).unwrap_or_else(|_| vec![Complex32::new(0.0, 0.0); self.fourier.size()]);
+        let recon_complex = self.fourier.filtered_range(self.k_min, self.k_max).unwrap_or_else(|_| vec![Complex32::new(0.0, 0.0); self.fourier.size()]);
 
         if current_point < 2 || recon_complex.len() < 2 { return; }
 
@@ -390,11 +380,10 @@ impl Fourier {
     /// Plots the Fourier components as vectors on the canvas.
     fn plot_fourier_components(&self, current_point: usize) {
         let mut current_complex = Complex32::new(0.0, 0.0);
-        let (k_min, k_max) = self.clamped_frequency_range();
         let total_points = self.fourier.size();
 
         // Draw positive frequencies (including DC)
-        for k in k_min..=k_max {
+        for k in self.k_min..=self.k_max {
             let component = self.fourier.get_component(k, current_point);
             let next_complex = current_complex + component;
             let (start_px, start_py) = self.viewport_to_canvas(current_complex.re, current_complex.im);
@@ -423,81 +412,15 @@ impl Fourier {
         self.canvas.fill_circle(tip_px, tip_py, 3.0, canvas::TAB_RED);
     }
 
-    /// Returns the clamped frequency range (k_min, k_max) based on the maximum frequency.
-    fn clamped_frequency_range(&self) -> (usize, usize) {
-        let max_k = self.fourier.max_frequency();
-        let k_min = if self.k_min > max_k { max_k } else { self.k_min };
-        let k_max = if self.k_max > max_k { max_k } else { self.k_max };
-        (k_min, k_max)
-    }
-
 }
 
 struct AnimationEventHandler;
 
 impl canvas::EventHandler for AnimationEventHandler {
-    fn on_mouse_down(&mut self, _canvas: &canvas::Canvas, _x: f32, _y: f32, button: canvas::MouseButton) {
-        match button {
-            canvas::MouseButton::Left => {
-                // Left click to pause/play animation
-                ANIMATION.with(|cell| {
-                    if let Some(ref mut animation) = *cell.borrow_mut() {
-                        if animation.is_paused() {
-                            animation.play();
-                        } else {
-                            animation.pause();
-                        }
-                    }
-                });
-            },
-            canvas::MouseButton::Right => {
-                // Right click to reset animation speed to normal
-                ANIMATION.with(|cell| {
-                    if let Some(ref mut animation) = *cell.borrow_mut() {
-                        animation.set_speed(1.0);
-                    }
-                });
-            },
-            _ => {}
-        }
-    }
-
-    fn on_key_down(&mut self, _canvas: &canvas::Canvas, key_code: canvas::KeyCode) {
-        // Add keyboard controls for animation
+    fn on_animation_frame(&mut self, _canvas: &canvas::Canvas, elapsed: f32) {
         ANIMATION.with(|cell| {
             if let Some(ref mut animation) = *cell.borrow_mut() {
-                match key_code {
-                    canvas::KeyCode::Space => {
-                        // Space bar to pause/play
-                        if animation.is_paused() {
-                            animation.play();
-                        } else {
-                            animation.pause();
-                        }
-                    },
-                    canvas::KeyCode::ArrowUp => {
-                        // Arrow up to increase speed
-                        animation.set_speed(animation.speed() + 0.25);
-                    },
-                    canvas::KeyCode::ArrowDown => {
-                        // Arrow down to decrease speed
-                        let new_speed = (animation.speed() - 0.25).max(0.1);
-                        animation.set_speed(new_speed);
-                    },
-                    canvas::KeyCode::R => {
-                        // R key to reset speed
-                        animation.set_speed(1.0);
-                    },
-                    _ => {}
-                }
-            }
-        });
-    }
-
-    fn on_animation_frame(&mut self, _canvas: &canvas::Canvas, _elapsed: f32) {
-        ANIMATION.with(|cell| {
-            if let Some(ref mut animation) = *cell.borrow_mut() {
-                animation.step();
+                animation.step(elapsed as f64);
             }
         });
     }
@@ -527,8 +450,8 @@ pub fn play_pause_animation(k_min: usize, k_max: usize, example_code: usize, ini
                 init_fn(k_min, k_max, example_code);
             } else if var.is_paused() {
                 var.play();
-            } else if var.speed() > 1.0 || var.speed() < 1.0 {
-                var.set_speed(1.0);
+            } else if var.speed() > DEFAULT_SPEED || var.speed() < DEFAULT_SPEED {
+                var.set_speed(DEFAULT_SPEED);
             } else {
                 var.pause();
             }
@@ -552,7 +475,7 @@ pub fn stop_animation() {
 pub fn increase_animation_speed() {
     ANIMATION.with(|cell| {
         if let Some(ref mut var) = *cell.borrow_mut() {
-            var.set_speed(var.speed() + 0.5);
+            var.set_speed(3.0 * var.speed() / 2.0);
         }
     });
 }
@@ -561,7 +484,7 @@ pub fn increase_animation_speed() {
 pub fn decrease_animation_speed() {
     ANIMATION.with(|cell| {
         if let Some(ref mut var) = *cell.borrow_mut() {
-            var.set_speed(var.speed() - 0.5);
+            var.set_speed( 2.0 * var.speed() / 3.0);
         }
     });
 }
