@@ -15,8 +15,6 @@ pub struct Plotter {
     font_family: String,
     font_size: f32,
 
-    hide_axes: bool,
-
     // Additional fields can be added for more features like grid lines, axes, etc.
     data: Vec<FunctionData>,
 }
@@ -46,10 +44,9 @@ impl Plotter {
                     y_ticks: 10,
                     font_family: "monospace".to_string(),
                     font_size: 12.0,
-                    hide_axes: false,
                     data: Vec::new(),
                 };
-                plotter.canvas.register_handler(PlotterEvents);
+                plotter.canvas.register_handler(PlotterEvents::new());
                 plotter
             });
 
@@ -83,8 +80,6 @@ impl Plotter {
     pub fn set_y_ticks(&mut self, ticks: u32) { self.y_ticks = ticks; }
     /// Set the font size for text rendering
     pub fn set_font_size(&mut self, size: f32) { self.font_size = size; }
-    /// Hide the axes
-    pub fn hide_axes(&mut self) { self.hide_axes = true; }
     /// Set preserve aspect ratio when drawing
     /// This is useful for ensuring that circles appear as circles, etc.
     pub fn preserve_aspect_ratio(&mut self, preserve: bool) { self.viewport.preserve_aspect_ratio = preserve; }
@@ -93,6 +88,32 @@ impl Plotter {
     pub fn reset_zoom(&mut self) {
         self.viewport.x_auto = true;
         self.viewport.y_auto = true;
+        self.show();
+    }
+
+
+    /// Zoom around a specific point with independent X and Y factors
+    pub fn zoom_at_point(&mut self, x_factor: f32, y_factor: f32, center_x: f32, center_y: f32) {
+        // Calculate the current viewport dimensions
+        let current_width = self.viewport.x_max - self.viewport.x_min;
+        let current_height = self.viewport.y_max - self.viewport.y_min;
+
+        // Calculate the new viewport dimensions
+        let new_width = current_width / x_factor;
+        let new_height = current_height / y_factor;
+
+        // Calculate how much the zoom point should move relative to viewport edges
+        let x_ratio = (center_x - self.viewport.x_min) / current_width;
+        let y_ratio = (center_y - self.viewport.y_min) / current_height;
+
+        // Set new viewport boundaries to keep the zoom point fixed
+        self.viewport.x_min = center_x - new_width * x_ratio;
+        self.viewport.x_max = center_x + new_width * (1.0 - x_ratio);
+        self.viewport.y_min = center_y - new_height * y_ratio;
+        self.viewport.y_max = center_y + new_height * (1.0 - y_ratio);
+
+        self.viewport.x_auto = false;
+        self.viewport.y_auto = false;
         self.show();
     }
 
@@ -181,10 +202,8 @@ impl Plotter {
         }
 
         self.canvas.clear();
-        if !self.hide_axes {
-            self.draw_grid();
-            self.draw_axes();
-        }
+        self.draw_grid();
+        self.draw_axes();
 
         for func in &self.data {
             match func.style {
@@ -213,9 +232,13 @@ impl Plotter {
                     let bar_width = func.bar_width;
 
                     for i in 0..x_data.len() {
-                        // Calculate left and right edges of the bar
-                        let (x0, y0) = self.viewport_to_canvas(x_data[i], 0.0);
-                        let (x1, y1) = self.viewport_to_canvas(x_data[i] + bar_width, y_data[i]);
+                        // Calculate left and right edges of the bar, centered at x_data[i]
+                        let half_width = bar_width / 2.0;
+                        let left_edge = x_data[i] - half_width;
+                        let right_edge = x_data[i] + half_width;
+
+                        let (x0, y0) = self.viewport_to_canvas(left_edge, 0.0);
+                        let (x1, y1) = self.viewport_to_canvas(right_edge, y_data[i]);
                         self.canvas.fill_rect(x0, y0, x1-x0, y1 - y0, 0.0, *color);
                     }
                 }
@@ -396,7 +419,20 @@ thread_local! {
     static PLOTTER_REGISTRY: RefCell<HashMap<u32, Plotter>> = RefCell::new(HashMap::new());
 }
 
-struct PlotterEvents;
+struct PlotterEvents {
+    // Keyboard state tracking for modifier keys
+    ctrl_pressed: bool,
+    shift_pressed: bool,
+}
+
+impl PlotterEvents {
+    pub fn new() -> Self {
+        PlotterEvents {
+            ctrl_pressed: false,
+            shift_pressed: false,
+        }
+    }
+}
 
 impl canvas::EventHandler for PlotterEvents {
     fn on_mouse_move(&mut self, canvas: &canvas::Canvas, x: f32, y: f32) {
@@ -408,19 +444,6 @@ impl canvas::EventHandler for PlotterEvents {
                 // Handle active viewport operations
                 if let Some(view) = &plotter.viewport.on_update {
                     match view.operation {
-                        ViewportOperation::Zoom => {
-                            // For zoom selection, show selection rectangle
-                            let (x_min, y_min) = plotter.viewport_to_canvas(view.x_min, view.y_min);
-
-                            // Update the selection area
-                            if let Some(update_view) = plotter.viewport.on_update.as_mut() {
-                                update_view.x_max = x;
-                                update_view.y_max = y;
-                            }
-
-                            plotter.show();
-                            plotter.canvas.stroke_rect(x_min, y_min, x - x_min, y - y_min, 0.0, 1.0, canvas::DARK_GRAY);
-                        },
                         ViewportOperation::Pan => {
                             // For panning, update viewport in real-time
                             let (new_x, new_y) = plotter.canvas_to_viewport(x, y);
@@ -436,6 +459,7 @@ impl canvas::EventHandler for PlotterEvents {
 
                             plotter.show();
                         }
+                        _ => {}
                     }
                 }
             }
@@ -448,10 +472,10 @@ impl canvas::EventHandler for PlotterEvents {
                 let (x, y) = plotter.canvas_to_viewport(x, y);
                 match button {
                     canvas::MouseButton::Left => {
-                        // start zoom selection
+                        // start pan operation with left mouse
                         plotter.viewport.on_update = Some(UpdateViewport {
                             x_min: x, x_max: x, y_min: y, y_max: y,
-                            operation: ViewportOperation::Zoom
+                            operation: ViewportOperation::Pan
                         });
                     },
                     canvas::MouseButton::Middle => {
@@ -462,10 +486,8 @@ impl canvas::EventHandler for PlotterEvents {
                         });
                     },
                     canvas::MouseButton::Right => {
-                        // reset zoom to auto-range
-                        plotter.viewport.x_auto = true;
-                        plotter.viewport.y_auto = true;
-                        plotter.show();
+                        // Reset zoom to auto-range
+                        plotter.reset_zoom();
                     },
                     _ => {}
                 }
@@ -473,34 +495,54 @@ impl canvas::EventHandler for PlotterEvents {
         });
     }
 
-    fn on_mouse_up(&mut self, canvas: &Canvas, x: f32, y: f32, _button: canvas::MouseButton) {
+    fn on_mouse_up(&mut self, canvas: &Canvas, _x: f32, _y: f32, _button: canvas::MouseButton) {
         PLOTTER_REGISTRY.with(|reg| {
             if let Some(plotter) = reg.borrow_mut().get_mut(&canvas.id()) {
-                if let Some(view) = plotter.viewport.on_update.take() {
-                    let (current_x, current_y) = plotter.canvas_to_viewport(x, y);
+                // End any active pan operation
+                plotter.viewport.on_update = None;
+                plotter.show();
+            }
+        });
+    }
 
-                    match view.operation {
-                        ViewportOperation::Zoom => {
-                            // Left button: apply zoom selection
-                            let width = (current_x - view.x_min).abs();
-                            let height = (current_y - view.y_min).abs();
-
-                            // Only apply zoom if the selection area is large enough
-                            let min_width = (plotter.viewport.x_max - plotter.viewport.x_min) * 0.01;
-                            let min_height = (plotter.viewport.y_max - plotter.viewport.y_min) * 0.01;
-
-                            if width > min_width && height > min_height {
-                                let x_min = f32::min(view.x_min, current_x);
-                                let y_min = f32::min(view.y_min, current_y);
-                                plotter.set_x_range(x_min, x_min + width);
-                                plotter.set_y_range(y_min, y_min + height);
-                            }
-                        },
-                        _ => {}
-                    }
-
-                    plotter.show();
+    fn on_key_down(&mut self, canvas: &Canvas, key_code: canvas::KeyCode) {
+        PLOTTER_REGISTRY.with(|reg| {
+            if let Some(plotter) = reg.borrow_mut().get_mut(&canvas.id()) {
+                match key_code {
+                    canvas::KeyCode::Key0  => { plotter.reset_zoom();      },
+                    canvas::KeyCode::Ctrl  => { self.ctrl_pressed = true;  },
+                    canvas::KeyCode::Shift => { self.shift_pressed = true; },
+                    _ => {}
                 }
+            }
+        });
+    }
+
+    fn on_key_up(&mut self, canvas: &Canvas, key_code: canvas::KeyCode) {
+        PLOTTER_REGISTRY.with(|reg| {
+            if let Some(_plotter) = reg.borrow_mut().get_mut(&canvas.id()) {
+                match key_code {
+                    canvas::KeyCode::Ctrl  => { self.ctrl_pressed = false;  },
+                    canvas::KeyCode::Shift => { self.shift_pressed = false; },
+                    _ => {}
+                }
+            }
+        });
+    }
+
+    fn on_wheel(&mut self, canvas: &Canvas, x: f32, y: f32, delta_y: f32) {
+        PLOTTER_REGISTRY.with(|reg| {
+            if let Some(plotter) = reg.borrow_mut().get_mut(&canvas.id()) {
+                let (viewport_x, viewport_y) = plotter.canvas_to_viewport(x, y);
+
+                let factor = if delta_y > 0.0 { 0.9 } else { 1.1 };
+                let (x_factor, y_factor) =
+                    if self.ctrl_pressed { (factor, 1.0) }
+                    else if self.shift_pressed { (1.0, factor) }
+                    else { (factor, factor) };
+
+                // Apply the appropriate zoom based on modifier keys
+                plotter.zoom_at_point(x_factor, y_factor, viewport_x, viewport_y);
             }
         });
     }

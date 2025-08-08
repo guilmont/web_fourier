@@ -22,6 +22,31 @@ thread_local! {
 /// Example data
 ///////////////////////////////////////////////////////////////////////////////
 
+/// Find the frequency range where power is above a threshold
+fn find_significant_frequency_range(freq: &[f32], power: &[f32]) -> (f32, f32) {
+    let max_power = power.iter().fold(0.0f32, |acc, &x| acc.max(x));
+    let threshold = max_power * 0.001;
+
+    let mut min_freq = freq[0];
+    let mut max_freq = freq[freq.len() - 1];
+
+    for (i, &p) in power.iter().enumerate() {
+        if p >= threshold {
+            min_freq = freq[i];
+            break;
+        }
+    }
+
+    for (i, &p) in power.iter().enumerate().rev() {
+        if p >= threshold {
+            max_freq = freq[i];
+            break;
+        }
+    }
+
+    (min_freq, max_freq)
+}
+
 fn generate_cache(kind: u32) -> ExampleCache {
     const TOTAL_NUM_POINTS: usize = 500;
     let mut t = Vec::with_capacity(TOTAL_NUM_POINTS);
@@ -75,15 +100,20 @@ fn plot_cached_example(k_min: usize, k_max: usize, cache: &mut ExampleCache) {
 
 fn plot_cached_spectrum(cache: &mut ExampleCache) {
     // Now plot the Fourier spectrum
-    let power = cache.fourier.power_spectrum();
-    let n = power.len();
-    let freq: Vec<f32> = (0..n).map(|k| k as f32).collect();
+    let (freq, power) = cache.fourier.power_spectrum(true);
+
+    // Find the range where power is significant
+    let (min_freq, max_freq) = find_significant_frequency_range(&freq, &power);
 
     let plt = plotter::Plotter::get_or_create("spectrum-canvas");
     if let Err(msg) = plt.plot_histogram(&freq, &power, canvas::TAB_GREEN, 1.0) {
         console::error(&format!("Error plotting power spectrum: {}", msg));
         return;
     }
+
+    // Set the x-axis range to focus on significant frequencies
+    plt.set_x_range(min_freq, max_freq);
+
     plt.show();
 }
 
@@ -180,16 +210,18 @@ fn init_animation_on_canvas(k_min: usize, k_max: usize, example_code: usize) {
     match math::Fourier::from_complex(data) {
         Ok(fourier) => {
             // Plot the frequency spectrum histogram once during initialization
-            let power = fourier.power_spectrum();
+            let (freq, power) = fourier.power_spectrum(true);
 
-            let n = power.len();
-            let freq: Vec<f32> = (0..n).map(|k| k as f32).collect();
+            // Find the range where power is significant
+            let (min_freq, max_freq) = find_significant_frequency_range(&freq, &power);
 
             // Plot the spectrum histogram
             let spectrum_plt = plotter::Plotter::get_or_create("animation-spectrum-canvas");
             if let Err(msg) = spectrum_plt.plot_histogram(&freq, &power, canvas::TAB_GREEN, 1.0) {
                 console::error(&format!("Error plotting animation spectrum: {}", msg));
             } else {
+                // Set the x-axis range to focus on significant frequencies
+                spectrum_plt.set_x_range(min_freq, max_freq);
                 spectrum_plt.show();
             }
 

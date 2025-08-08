@@ -50,6 +50,39 @@ The inverse Fourier Transform in the unitary formulation is:
 f(t) = \frac{1}{\sqrt{2\pi}} \int_{-\infty}^{\infty} F(\omega) e^{i\omega t} d\omega
 \end{equation}
 
+The Fourier Transform has several important properties that make it a powerful tool for analyzing signals. These properties include linearity, time and frequency shifting, and the convolution theorem.
+
+\begin{table}[h!]
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Property} & \textbf{Description} \\
+\hline
+Linearity & $\mathcal{F}\{af(t) + bg(t)\} = aF(\omega) + bG(\omega)$ \\
+\hline
+Time Shifting & $\mathcal{F}\{f(t-t_0)\} = F(\omega)e^{-i\omega t_0}$ \\
+\hline
+Frequency Shifting & $\mathcal{F}\{f(t)e^{i\omega_0 t}\} = F(\omega - \omega_0)$ \\
+\hline
+Convolution Theorem & $\mathcal{F}\{f(t) * g(t)\} = F(\omega) \cdot G(\omega)$ \\
+\hline
+\end{tabular}
+\caption{Key Properties of the Fourier Transform}
+\end{table}
+
+\subsubsection*{Orthonormality of the Continuous Fourier Basis}
+The set of functions $\left\{\frac{e^{i\omega t}}{\sqrt{2\pi}}\right\}$ forms an orthonormal basis for square-integrable functions on $\mathbb{R}$. To check orthonormality, we compute the inner product (which for complex functions involves the complex conjugate):
+\begin{equation}
+\int_{-\infty}^{\infty} \frac{e^{i\omega t}}{\sqrt{2\pi}} \cdot \overline{\frac{e^{i\omega' t}}{\sqrt{2\pi}}} dt = \frac{1}{2\pi} \int_{-\infty}^{\infty} e^{i(\omega-\omega')t} dt = \delta(\omega-\omega')
+\end{equation}
+where the overline denotes complex conjugation. Orthonormality ensures that the Fourier coefficients are independent and leads to Parseval's theorem (energy conservation).
+
+\subsubsection*{Parseval's Theorem (Continuous Case)}
+Parseval's theorem states that the total energy of a signal is preserved under the Fourier Transform:
+\begin{equation}
+\int_{-\infty}^{\infty} |f(t)|^2 dt = \int_{-\infty}^{\infty} |F(\omega)|^2 d\omega
+\end{equation}
+This means the energy (or power) of a signal in the time domain is exactly equal to the energy in the frequency domain. This property is a direct consequence of the orthonormality of the Fourier basis and is fundamental in signal processing, physics, and engineering, as it allows analysis and filtering to be performed equivalently in either domain.
 
 \subsection{Physical Interpretation}
 
@@ -70,66 +103,42 @@ where $F^*$ denotes the complex conjugate. This means the negative frequency com
 
 This symmetry is fundamental for interpreting the spectrum of real signals and is analogous to the discrete case. In particular, the real part of $F(\omega)$ for $\omega > 0$ is doubled in the reconstruction of $f(t)$, since the contributions from $+\omega$ and $-\omega$ add together. Thus, the amplitude at each positive frequency is often interpreted as $2\operatorname{Re}[F(\omega)]$ (or $2|F(\omega)|$ for the magnitude spectrum), reflecting the combined effect of both positive and negative frequencies.
 
-\subsection{Key Properties}
-
-\subsubsection{Linearity}
-If $\mathcal{F}\{f(t)\} = F(\omega)$ and $\mathcal{F}\{g(t)\} = G(\omega)$, then:
-\[
-\mathcal{F}\{af(t) + bg(t)\} = aF(\omega) + bG(\omega)
-\]
-\subsubsection{Linearity}
-If $\mathcal{F}\{f(t)\} = F(\omega)$ and $\mathcal{F}\{g(t)\} = G(\omega)$, then:
-\[
-\mathcal{F}\{af(t) + bg(t)\} = aF(\omega) + bG(\omega)
-\]
-
-\subsubsection{Time Shifting}
-\[
-\mathcal{F}\{f(t-t_0)\} = F(\omega)e^{-i\omega t_0}
-\]
-
-\subsubsection{Frequency Shifting}
-\[
-\mathcal{F}\{f(t)e^{i\omega_0 t}\} = F(\omega - \omega_0)
-\]
-
-\subsubsection{Convolution Theorem}
-\[
-\mathcal{F}\{f(t) * g(t)\} = F(\omega) \cdot G(\omega)
-\]
-
-
 \section{The Discrete Fourier Transform (DFT)}
 
 In practice, we work with discrete, finite-length signals. The Discrete Fourier Transform (DFT) is the discrete analog of the continuous Fourier Transform, designed for sequences of $N$ samples.
 
 For a discrete signal $x[n]$ where $n = 0, 1, 2, \ldots, N-1$, the DFT is defined as:
 
+\begin{equation}
+X[k] = \frac{1}{\sqrt{N}} \sum_{n=0}^{N-1} x[n] e^{-i 2\pi k n / N}
+\end{equation}
 
 \[
 X[k] = \frac{1}{\sqrt{N}} \sum_{n=0}^{N-1} x[n] e^{-i 2\pi k n / N}
 \]
 where $k = 0, 1, 2, \ldots, N-1$ are the frequency bin indices.
 
-The inverse DFT (IDFT) in the unitary formulation is:
-\[
+The inverse DFT (IDFT) is:
+
+\begin{equation}
 x[n] = \frac{1}{\sqrt{N}} \sum_{k=0}^{N-1} X[k] e^{i 2\pi k n / N}
-\]
+\end{equation}
 
 The power spectrum for discrete signals is computed as $P[k] = |X[k]|^2$, where $X[k]$ is the DFT of $x[n]$. This quantity shows the energy content at each frequency bin $k$ and is widely used to analyze the frequency characteristics of digital signals.
 
+\subsubsection*{Orthonormality of the Discrete Fourier Basis}
+The set of vectors $\left\{\frac{1}{\sqrt{N}} e^{i2\pi k n/N}\right\}$ for $k=0,1,\ldots,N-1$ forms an orthonormal basis for $\mathbb{C}^N$ under the discrete inner product. The inner product for complex vectors also uses the complex conjugate:
+\begin{equation}
+\sum_{n=0}^{N-1} \frac{1}{\sqrt{N}} e^{i2\pi k n/N} \cdot \overline{\frac{1}{\sqrt{N}} e^{i2\pi k' n/N}} = \frac{1}{N} \sum_{n=0}^{N-1} e^{i2\pi (k-k') n/N} = \delta_{k,k'}
+\end{equation}
+where the overline denotes complex conjugation, just as in the continuous case. This is the complex analog of the dot product. This property guarantees the independence of frequency components and underpins Parseval's theorem in the discrete case.
 
-\subsection{Matrix Representation}
-
-The DFT can be written as a matrix multiplication in the unitary formulation:
-\[
-\mathbf{X} = \mathbf{U}_N \mathbf{x}
-\]
-where $\mathbf{U}_N$ is the $N \times N$ unitary DFT matrix with elements:
-\[
-[\mathbf{U}_N]_{k,n} = \frac{1}{\sqrt{N}} e^{-i 2\pi k n / N}
-\]
-Direct computation requires $O(N^2)$ complex multiplications.
+\subsubsection*{Parseval's Theorem (Discrete Case)}
+In the discrete case, Parseval's theorem states:
+\begin{equation}
+\sum_{n=0}^{N-1} |x[n]|^2 = \sum_{k=0}^{N-1} |X[k]|^2
+\end{equation}
+That is, the sum of the squared magnitudes of the signal samples equals the sum of the squared magnitudes of its DFT coefficients. This is crucial for digital signal processing, as it guarantees that no energy is lost or gained when transforming between time and frequency domains, and enables energy-based analysis and filtering in either domain.
 
 \subsection{Frequency Interpretation}
 
@@ -137,6 +146,8 @@ The DFT computes the spectrum at $N$ equally spaced frequency points:
 \begin{equation}
 \omega_k = \frac{2\pi k}{N}, \quad k = 0, 1, \ldots, N-1
 \end{equation}
+
+Even though $k$ only ranges from $0$ to $N-1$, these frequency indices actually wrap around the unit circle in the complex plane. This means the DFT is periodic in frequency with period $N$, and the upper half of the frequency bins (for $k > N/2$) can be interpreted as negative frequencies. Specifically, the frequency bin $k$ corresponds to a frequency of $\omega_k = 2\pi k/N$, but for $k > N/2$, this is equivalent to $\omega_k - 2\pi = 2\pi (k-N)/N$, which is a negative frequency. As a result, the DFT spectrum is often visualized by shifting the zero-frequency component to the center (using, for example, the `fftshift` operation in software), so that negative frequencies appear on the left and positive frequencies on the right. This makes the symmetry and interpretation of the spectrum more apparent, especially for real-valued signals.
 
 If the sampling rate is $f_s$, then the actual frequencies are:
 \begin{equation}

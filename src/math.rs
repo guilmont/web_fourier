@@ -52,9 +52,22 @@ impl Fourier {
         Ok(idft(&self.transform, k_min, k_max))
     }
 
-    /// Returns the power spectrum (magnitude squared) of the DFT coefficients.
-    pub fn power_spectrum(&self) -> Vec<f32> {
-        self.transform.iter().map(|c| c.norm_sqr()).collect()
+    /// Returns the power spectrum (magnitude squared) and phase (angle) of the DFT coefficients as two vectors.
+    /// If `shifted` is true, the output is fftshifted (zero frequency centered).
+    pub fn power_spectrum(&self, shifted: bool) -> (Vec<f32>, Vec<f32>) {
+        let n = self.transform.len();
+        let mut freq: Vec<f32> = (0..n).map(|k| k as f32).collect();
+        let mut powers: Vec<f32> = self.transform.iter().map(|c| c.norm_sqr()).collect();
+        if shifted {
+            let max_k = self.max_frequency()+1;
+            freq.rotate_left(max_k);
+            powers.rotate_left(max_k);
+            for i in 0..max_k {
+                // Adjust frequencies to be centered around zero
+                freq[i] -= n as f32;
+            }
+        }
+        (freq, powers)
     }
 
     /// Returns the value of a single frequency component at a given time step.
@@ -64,7 +77,7 @@ impl Fourier {
         let angle = 2.0 * std::f32::consts::PI * (time_step as f32) * (frequency as f32) / (total_points as f32);
         let exp_term = Complex32::new(0.0, angle).exp();
 
-        self.transform[frequency] * exp_term
+        self.transform[frequency] * exp_term / (total_points as f32).sqrt()
     }
 
     /// Returns the number of points in the original signal.
@@ -79,8 +92,8 @@ impl Fourier {
 /// Computes the Discrete Fourier Transform (DFT) of the input data.
 fn dft(data: &[Complex32]) -> Vec<Complex32> {
     let total_points = data.len();
-    let param = 1.0 / total_points as f32;
-    let omega = Complex32::new(0.0, -2.0 * std::f32::consts::PI * param);
+    let norm = 1.0 / (total_points as f32).sqrt();
+    let omega = Complex32::new(0.0, -2.0 * std::f32::consts::PI / total_points as f32);
 
     let mut result = Vec::<Complex32>::with_capacity(total_points);
     for k in 0..total_points {
@@ -89,7 +102,7 @@ fn dft(data: &[Complex32]) -> Vec<Complex32> {
             let angle = omega * (k as f32) * (i as f32);
             res += val * angle.exp();
         }
-        result.push(res * param); // No scaling in forward transform
+        result.push(res * norm); // Unitary scaling
     }
     result
 }
@@ -100,6 +113,7 @@ fn dft(data: &[Complex32]) -> Vec<Complex32> {
 /// are included by summing the coefficients at k and N-k.
 fn idft(transform: &[Complex32], k_min: usize, k_max: usize) -> Vec<Complex32> {
     let total_points = transform.len();
+    let norm = 1.0 / (total_points as f32).sqrt();
     let omega = Complex32::new(0.0, 2.0 * std::f32::consts::PI / total_points as f32);
 
     let mut result = Vec::<Complex32>::with_capacity(total_points);
@@ -114,7 +128,7 @@ fn idft(transform: &[Complex32], k_min: usize, k_max: usize) -> Vec<Complex32> {
             // The transform is symetric on 180 degrees, so we must include  negative frequency
             res += transform[total_points - k] * (partial * (total_points - k) as f32).exp();
         }
-        result.push(res);
+        result.push(res * norm); // Unitary scaling
     }
     result
 }
