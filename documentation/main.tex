@@ -7,7 +7,6 @@
 \usepackage{geometry}
 \usepackage{hyperref}
 \usepackage{algorithm}
-\usepackage{algorithmic}
 
 \title{The Fourier Transform: From Continuous to Discrete and the FFT Algorithm}
 \author{Your Name}
@@ -21,19 +20,23 @@
 \newpage
 
 \section{Introduction}
-
 The Fourier Transform is one of the most powerful mathematical tools in signal processing, physics, and engineering. It allows us to decompose any signal into its constituent frequency components, revealing the "hidden" periodicities within seemingly complex waveforms. This document provides a comprehensive overview of the Fourier Transform, starting from the continuous case, moving to the discrete version, and finally exploring the Fast Fourier Transform (FFT) algorithm.
+
+	\textbf{Note:} Throughout this document, we use the \emph{unitary (normalized) formulation} of the Fourier Transform, where both the forward and inverse transforms are normalized to ensure energy preservation and symmetry. This means:
+\begin{itemize}
+    \item The continuous Fourier Transform and its inverse are normalized by $1/\sqrt{2\pi}$.
+    \item The discrete Fourier Transform (DFT) and its inverse are normalized by $1/\sqrt{N}$.
+\end{itemize}
+
 
 \section{The Continuous Fourier Transform}
 
 \subsection{Definition and Intuition}
 
-The Continuous Fourier Transform (CFT) of a function $f(t)$ is defined as:
-
+The Continuous Fourier Transform (CFT) of a function $f(t)$ in the unitary (normalized) formulation is defined as:
 \begin{equation}
-F(\omega) = \int_{-\infty}^{\infty} f(t) e^{-i\omega t} dt
+F(\omega) = \frac{1}{\sqrt{2\pi}} \int_{-\infty}^{\infty} f(t) e^{-i\omega t} dt
 \end{equation}
-
 where:
 \begin{itemize}
     \item $F(\omega)$ is the frequency domain representation
@@ -42,24 +45,21 @@ where:
     \item $i$ is the imaginary unit
 \end{itemize}
 
-The inverse Fourier Transform recovers the original signal:
-
+The inverse Fourier Transform in the unitary formulation is:
 \begin{equation}
-f(t) = \frac{1}{2\pi} \int_{-\infty}^{\infty} F(\omega) e^{i\omega t} d\omega
+f(t) = \frac{1}{\sqrt{2\pi}} \int_{-\infty}^{\infty} F(\omega) e^{i\omega t} d\omega
 \end{equation}
+
 
 \subsection{Physical Interpretation}
 
 The Fourier Transform essentially asks: "How much of each frequency $\omega$ is present in the signal $f(t)$?" The complex exponential $e^{-i\omega t} = \cos(\omega t) - i\sin(\omega t)$ acts as a "probe" that correlates the signal with sinusoidal components at frequency $\omega$.
 
-When we compute $F(\omega)$, we obtain:
 \begin{itemize}
     \item \textbf{Magnitude} $|F(\omega)|$: represents the amplitude of frequency component $\omega$
     \item \textbf{Phase} $\arg(F(\omega))$: represents the phase shift of that frequency component
 \end{itemize}
-
-The squared magnitude $|F(\omega)|^2$ is called the \textbf{power spectrum} of the signal. It describes how the energy of the signal is distributed among different frequencies. Peaks in the power spectrum indicate dominant frequencies present in the original signal. The power spectrum is a fundamental tool in signal analysis, audio and image processing, and many areas of physics and engineering.
-
+Direct computation requires $O(N^2)$ complex multiplications.
 \subsection{Symmetry for Real-Valued Functions}
 
 If $f(t)$ is real-valued, its Fourier Transform $F(\omega)$ satisfies the Hermitian symmetry property:
@@ -74,48 +74,62 @@ This symmetry is fundamental for interpreting the spectrum of real signals and i
 
 \subsubsection{Linearity}
 If $\mathcal{F}\{f(t)\} = F(\omega)$ and $\mathcal{F}\{g(t)\} = G(\omega)$, then:
-\begin{equation}
+\[
 \mathcal{F}\{af(t) + bg(t)\} = aF(\omega) + bG(\omega)
-\end{equation}
+\]
+\subsubsection{Linearity}
+If $\mathcal{F}\{f(t)\} = F(\omega)$ and $\mathcal{F}\{g(t)\} = G(\omega)$, then:
+\[
+\mathcal{F}\{af(t) + bg(t)\} = aF(\omega) + bG(\omega)
+\]
 
 \subsubsection{Time Shifting}
-\begin{equation}
+\[
 \mathcal{F}\{f(t-t_0)\} = F(\omega)e^{-i\omega t_0}
-\end{equation}
+\]
 
 \subsubsection{Frequency Shifting}
-\begin{equation}
+\[
 \mathcal{F}\{f(t)e^{i\omega_0 t}\} = F(\omega - \omega_0)
-\end{equation}
+\]
 
 \subsubsection{Convolution Theorem}
-\begin{equation}
+\[
 \mathcal{F}\{f(t) * g(t)\} = F(\omega) \cdot G(\omega)
-\end{equation}
+\]
 
-where $*$ denotes convolution.
 
 \section{The Discrete Fourier Transform (DFT)}
-
-\subsection{Motivation and Definition}
 
 In practice, we work with discrete, finite-length signals. The Discrete Fourier Transform (DFT) is the discrete analog of the continuous Fourier Transform, designed for sequences of $N$ samples.
 
 For a discrete signal $x[n]$ where $n = 0, 1, 2, \ldots, N-1$, the DFT is defined as:
 
-\begin{equation}
-X[k] = \sum_{n=0}^{N-1} x[n] e^{-i 2\pi k n / N}
-\end{equation}
 
+\[
+X[k] = \frac{1}{\sqrt{N}} \sum_{n=0}^{N-1} x[n] e^{-i 2\pi k n / N}
+\]
 where $k = 0, 1, 2, \ldots, N-1$ are the frequency bin indices.
 
-The inverse DFT (IDFT) is:
-
-\begin{equation}
-x[n] = \frac{1}{N} \sum_{k=0}^{N-1} X[k] e^{i 2\pi k n / N}
-\end{equation}
+The inverse DFT (IDFT) in the unitary formulation is:
+\[
+x[n] = \frac{1}{\sqrt{N}} \sum_{k=0}^{N-1} X[k] e^{i 2\pi k n / N}
+\]
 
 The power spectrum for discrete signals is computed as $P[k] = |X[k]|^2$, where $X[k]$ is the DFT of $x[n]$. This quantity shows the energy content at each frequency bin $k$ and is widely used to analyze the frequency characteristics of digital signals.
+
+
+\subsection{Matrix Representation}
+
+The DFT can be written as a matrix multiplication in the unitary formulation:
+\[
+\mathbf{X} = \mathbf{U}_N \mathbf{x}
+\]
+where $\mathbf{U}_N$ is the $N \times N$ unitary DFT matrix with elements:
+\[
+[\mathbf{U}_N]_{k,n} = \frac{1}{\sqrt{N}} e^{-i 2\pi k n / N}
+\]
+Direct computation requires $O(N^2)$ complex multiplications.
 
 \subsection{Frequency Interpretation}
 
@@ -172,61 +186,29 @@ x[n] & \text{if } 0 \leq n < N \\
 
 where $M > N$ is the new length.
 
-\subsection{Matrix Representation}
-
-The DFT can be written as a matrix multiplication:
-\begin{equation}
-\mathbf{X} = \mathbf{W}_N \mathbf{x}
-\end{equation}
-
-where $\mathbf{W}_N$ is the $N \times N$ DFT matrix with elements:
-\begin{equation}
-[\mathbf{W}_N]_{k,n} = e^{-i 2\pi k n / N}
-\end{equation}
-
-Direct computation requires $O(N^2)$ complex multiplications.
 
 \section{Fourier Transform for Parametrized Curves}
 
-\subsection{Introduction}
-
 For a parametrized curve $[x(t), y(t)]$, there are two common approaches to Fourier analysis:
-\begin{itemize}
-    \item \textbf{Component-wise:} Apply the Fourier Transform separately to $x(t)$ and $y(t)$.
-    \item \textbf{Complex signal:} Combine the components into a single complex signal $z(t) = x(t) + i y(t)$ and analyze $z(t)$.
-\end{itemize}
-Both approaches are useful and reveal different aspects of the curve's frequency content.
 
-\subsection{Definition}
 
-\textbf{Component-wise:}
-\begin{align}
-X(\omega) &= \int_{-\infty}^{\infty} x(t) e^{-i\omega t} dt \\
-Y(\omega) &= \int_{-\infty}^{\infty} y(t) e^{-i\omega t} dt
-\end{align}
+\textbf{Component-wise:} Apply the Fourier Transform separately to $x(t)$ and $y(t)$.
+\begin{equation}
+\begin{gathered}
+X(\omega) = \int_{-\infty}^{\infty} x(t) e^{-i\omega t} dt \qquad
+Y(\omega) = \int_{-\infty}^{\infty} y(t) e^{-i\omega t} dt
+\end{gathered}
+\end{equation}
 
-\textbf{Complex signal:}
+
+\textbf{Complex signal:} Combine the components into a single complex signal $z(t) = x(t) + i y(t)$ and analyze $z(t)$.
+
 \begin{equation}
 Z(\omega) = \int_{-\infty}^{\infty} [x(t) + i y(t)] e^{-i\omega t} dt
 \end{equation}
 
-\subsection{Reconstruction}
+Both approaches are useful and reveal different aspects of the curve's frequency content. Treating $x(t)$ and $y(t)$ separately is simple and useful when the components are independent. The complex approach is powerful for capturing phase relationships and correlations, and is often used in shape and motion analysis. Comparing both the individual and complex spectra can provide deeper insight into the structure and dynamics of the curve. For either approach, the power spectrum is given by the squared magnitude of the transform:
 
-\textbf{Component-wise:}
-\begin{align}
-x(t) &= \frac{1}{2\pi} \int_{-\infty}^{\infty} X(\omega) e^{i\omega t} d\omega \\
-y(t) &= \frac{1}{2\pi} \int_{-\infty}^{\infty} Y(\omega) e^{i\omega t} d\omega
-\end{align}
-
-\textbf{Complex signal:}
-\begin{equation}
-z(t) = \frac{1}{2\pi} \int_{-\infty}^{\infty} Z(\omega) e^{i\omega t} d\omega
-\end{equation}
-where $z(t) = x(t) + i y(t)$.
-
-\subsection{Power Spectrum}
-
-For either approach, the power spectrum is given by the squared magnitude of the transform:
 \begin{itemize}
     \item \textbf{Component-wise:} $|X(\omega)|^2$ and $|Y(\omega)|^2$ (can be summed for total power).
     \item \textbf{Complex signal:} $|Z(\omega)|^2$ (includes cross-terms and phase relationships).
@@ -243,18 +225,34 @@ Fourier analysis of parametrized curves is useful in:
 
 \subsection{Examples}
 
-\textbf{Circle:} $x(t) = \cos(t)$, $y(t) = \sin(t)$. As a complex signal, $z(t) = e^{it}$, whose Fourier Transform has a single frequency component.
+\begin{itemize}
+    \item \textbf{Epitrochoid:} An epitrochoid is a type of roulette curve traced by a point attached to a circle of radius $r$ rolling around the outside of a fixed circle of radius $R$. The parameter $d$ controls the distance from the center of the rolling circle to the tracing point. These curves can create intricate, spirograph-like patterns and are useful for demonstrating how complex periodic shapes can be decomposed into frequency components.
+    \begin{align}
+        x(t) &= (R + r) \cos t + d \cos\left(\frac{R + r}{r} t\right) \\
+        y(t) &= (R + r) \sin t + d \sin\left(\frac{R + r}{r} t\right)
+    \end{align}
+    (e.g., $R=5$, $r=1$, $d=2$)
 
-\textbf{Lissajous Curve:}
-\begin{align}
-x(t) &= \cos(2t) \\
-y(t) &= \sin(3t)
-\end{align}
-Component-wise, the spectra have peaks at frequencies $2$ and $3$. As a complex signal, $z(t) = \cos(2t) + i\sin(3t)$, the spectrum reflects both frequencies and their phase relationship.
+    \item \textbf{Rose curve:} The rose curve is a polar curve with petal-like shapes, defined by a sum of cosines with different frequencies. The number and shape of the petals depend on the coefficients and frequencies used. Rose curves are classic examples in Fourier analysis because their symmetry and periodicity make their frequency content easy to interpret.
+    \begin{align}
+        r(t) &= 3\cos(3t) + \cos(9t) + 0.5\cos(15t) \\
+        x(t) &= r(t)\cos t \\
+        y(t) &= r(t)\sin t
+    \end{align}
 
-\subsection{Choosing an Approach}
+    \item \textbf{Lissajous curve:} Lissajous curves are generated by combining two sinusoidal oscillations in perpendicular directions, often with different frequencies and a phase shift. They are used to illustrate the relationship between frequency, phase, and shape, and are common in signal analysis and physics demonstrations.
+    \begin{align}
+        x(t) &= 4\sin(3t) + 1.5\sin(6t) + 0.8\sin(9t) \\
+        y(t) &= 3\sin(5t + \phi) + 1.2\sin(10t) + 0.6\sin(15t)
+    \end{align}
+    (with $\phi = \pi/4$)
 
-Treating $x(t)$ and $y(t)$ separately is simple and useful when the components are independent. The complex approach is powerful for capturing phase relationships and correlations, and is often used in shape and motion analysis. Comparing both the individual and complex spectra can provide deeper insight into the structure and dynamics of the curve.
+    \item \textbf{Spirograph-like:} This example combines several sine and cosine terms with different amplitudes and frequencies to create a complex, closed curve reminiscent of patterns made by a spirograph toy. Such curves demonstrate how adding harmonics (higher-frequency components) affects the overall shape, and how Fourier series can represent intricate periodic patterns.
+    \begin{align}
+        x(t) &= 3\cos t + 2\cos(2t) + 1\cos(4t) + 0.5\cos(7t) \\
+        y(t) &= 3\sin t + 2\sin(2t) + 1\sin(4t) + 0.5\sin(7t)
+    \end{align}
+\end{itemize}
 
 \section{The Two-Dimensional Fourier Transform}
 
@@ -359,31 +357,28 @@ This symmetry allows us to compute all $N$ output points using only $N/2$ evalua
 
 \subsection{FFT Algorithm Pseudocode}
 
-\begin{algorithm}
-\caption{Cooley-Tukey FFT (Radix-2, Decimation-in-Time)}
-\begin{algorithmic}[1]
-\REQUIRE $x[0..N-1]$ where $N = 2^m$
-\ENSURE $X[0..N-1]$ (DFT of $x$)
 
-\IF{$N = 1$}
-    \RETURN $x[0]$
-\ENDIF
+\begin{quote}
+	extbf{Pseudocode: Cooley-Tukey FFT (Radix-2, Decimation-in-Time)}
 
-\STATE $x_{even} \leftarrow [x[0], x[2], x[4], \ldots, x[N-2]]$
-\STATE $x_{odd} \leftarrow [x[1], x[3], x[5], \ldots, x[N-1]]$
+\begin{verbatim}
+Input: x[0..N-1] where N = 2^m
+Output: X[0..N-1] (DFT of x)
 
-\STATE $E \leftarrow \text{FFT}(x_{even})$ \COMMENT{Recursive call}
-\STATE $O \leftarrow \text{FFT}(x_{odd})$ \COMMENT{Recursive call}
-
-\FOR{$k = 0$ to $N/2 - 1$}
-    \STATE $t \leftarrow e^{-i2\pi k/N} \cdot O[k]$ \COMMENT{Twiddle factor multiplication}
-    \STATE $X[k] \leftarrow E[k] + t$
-    \STATE $X[k + N/2] \leftarrow E[k] - t$
-\ENDFOR
-
-\RETURN $X$
-\end{algorithmic}
-\end{algorithm}
+if N = 1:
+    return x[0]
+else:
+    x_even = [x[0], x[2], ..., x[N-2]]
+    x_odd  = [x[1], x[3], ..., x[N-1]]
+    E = FFT(x_even)
+    O = FFT(x_odd)
+    for k = 0 to N/2-1:
+        t = exp(-i*2*pi*k/N) * O[k]
+        X[k] = E[k] + t
+        X[k+N/2] = E[k] - t
+    return X
+\end{verbatim}
+\end{quote}
 
 \subsection{Computational Complexity}
 
@@ -469,4 +464,3 @@ The FFT's $O(N \log N)$ complexity has made real-time spectral analysis possible
 
 
 \end{document}
-
