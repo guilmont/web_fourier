@@ -478,13 +478,6 @@ impl canvas::EventHandler for PlotterEvents {
                             operation: ViewportOperation::Pan
                         });
                     },
-                    canvas::MouseButton::Middle => {
-                        // start pan operation
-                        plotter.viewport.on_update = Some(UpdateViewport {
-                            x_min: x, x_max: x, y_min: y, y_max: y,
-                            operation: ViewportOperation::Pan
-                        });
-                    },
                     canvas::MouseButton::Right => {
                         // Reset zoom to auto-range
                         plotter.reset_zoom();
