@@ -13,403 +13,497 @@
 <body>
     <h1>The Fourier Transform: From Continuous to Discrete and the FFT Algorithm</h1>
 
-    <p>
-        The Fourier Transform is one of the most powerful mathematical tools in signal processing, physics, and
-        engineering. It allows us to decompose any signal into its constituent frequency components, revealing the
-        "hidden" periodicities within seemingly complex waveforms. This document provides a comprehensive overview of
-        the Fourier Transform, starting from the continuous case, moving to the discrete version, and finally exploring
-        the Fast Fourier Transform (FFT) algorithm.
-    </p>
-    <p>
-        <b>Note:</b> Throughout this document, we use the <i>unitary (normalized) formulation</i> of the Fourier
-        Transform, where both the forward and inverse transforms are normalized to ensure energy preservation and
-        symmetry. This means:
-    </p>
-    <ul>
-        <li>The continuous Fourier Transform and its inverse are normalized by \( \frac{1}{\sqrt{2\pi}} \).</li>
-        <li>The discrete Fourier Transform (DFT) and its inverse are normalized by \( \frac{1}{\sqrt{N}} \).</li>
-    </ul>
+    <div class="content-section">
+        <p>
+            The Fourier Transform is one of the most powerful mathematical tools in signal processing, physics, and
+            engineering. It allows us to decompose any signal into its constituent frequency components, revealing the
+            "hidden" periodicities within seemingly complex waveforms. This document provides a comprehensive overview
+            of
+            the Fourier Transform, starting from the continuous case, moving to the discrete version, and finally
+            exploring
+            the Fast Fourier Transform (FFT) algorithm.
+        </p>
+        <p>
+            <b>Note:</b> Throughout this document, we use the <i>unitary (normalized) formulation</i> of the Fourier
+            Transform, where both the forward and inverse transforms are normalized to ensure energy preservation and
+            symmetry. This means:
+        </p>
+        <ul>
+            <li>The continuous Fourier Transform and its inverse are normalized by \( \frac{1}{\sqrt{2\pi}} \).</li>
+            <li>The discrete Fourier Transform (DFT) and its inverse are normalized by \( \frac{1}{\sqrt{N}} \).</li>
+        </ul>
+
+        <div style="text-align: center; margin: 20px 0;">
+            <a href="https://github.com/guilmont/web_fourier" class="github-button" target="_blank" rel="noopener">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                </svg>
+                View Source on GitHub
+            </a>
+            <p style="margin-top: 10px; font-size: 14px; color: #b0b0b0;"><i>Interactive Fourier Transform visualization built with Rust + WebAssembly</i></p>
+        </div>
+    </div>
 
     <h2>The Continuous Fourier Transform</h2>
 
-    <h3>Definition and Intuition</h3>
-    <p>
-        The Continuous Fourier Transform (CFT) of a function \( f(t) \) in the unitary (normalized)
-        formulation is defined as:
-    </p>
-    \[
-    F(\omega) = \frac{1}{\sqrt{2\pi}} \int_{-\infty}^{\infty} f(t) e^{-i\omega t} dt
-    \]
-    <p>where:</p>
-    <ul>
-        <li><b>\( F(\omega) \):</b> frequency domain representation</li>
-        <li><b>\( f(t) \):</b> time domain signal</li>
-        <li><b>\( \omega \):</b> angular frequency (radians per second)</li>
-        <li><b>\( i \):</b> imaginary unit</li>
-    </ul>
-    <p>
-        The inverse Fourier Transform in the unitary formulation is:
-    </p>
-    \[
-    f(t) = \frac{1}{\sqrt{2\pi}} \int_{-\infty}^{\infty} F(\omega) e^{i\omega t} d\omega
-    \]
-    <p>
-        The Fourier Transform has several important properties that make it a powerful tool for analyzing signals. These
-        properties include linearity, time and frequency shifting, and the convolution theorem.
-    </p>
+    <div class="content-section">
+        <h3>Definition and Intuition</h3>
+        <p>
+            The Continuous Fourier Transform (CFT) of a function \( f(t) \) in the unitary (normalized)
+            formulation is defined as:
+        </p>
+        \[
+        F(\omega) = \frac{1}{\sqrt{2\pi}} \int_{-\infty}^{\infty} f(t) e^{-i\omega t} dt
+        \]
+        <p>where:</p>
+        <ul>
+            <li><b>\( F(\omega) \):</b> frequency domain representation</li>
+            <li><b>\( f(t) \):</b> time domain signal</li>
+            <li><b>\( \omega \):</b> angular frequency (radians per second)</li>
+            <li><b>\( i \):</b> imaginary unit</li>
+        </ul>
+        <p>
+            The inverse Fourier Transform in the unitary formulation is:
+        </p>
+        \[
+        f(t) = \frac{1}{\sqrt{2\pi}} \int_{-\infty}^{\infty} F(\omega) e^{i\omega t} d\omega
+        \]
+        <p>
+            The Fourier Transform has several important properties that make it a powerful tool for analyzing signals.
+            These
+            properties include linearity, time and frequency shifting, and the convolution theorem.
+        </p>
 
-    <div style="text-align:center;">
-        <table border="1" style="border-collapse:collapse; margin-left:auto; margin-right:auto; display:inline-table;">
-            <tr>
-                <th>Property</th>
-                <th>Description</th>
-            </tr>
-            <tr>
-                <td>Linearity</td>
-                <td>\( \mathcal{F}\{af(t) + bg(t)\} = aF(\omega) + bG(\omega) \)</td>
-            </tr>
-            <tr>
-                <td>Time Shifting</td>
-                <td>\( \mathcal{F}\{f(t-t_0)\} = F(\omega)e^{-i\omega t_0} \)</td>
-            </tr>
-            <tr>
-                <td>Frequency Shifting</td>
-                <td>\( \mathcal{F}\{f(t)e^{i\omega_0 t}\} = F(\omega - \omega_0) \)</td>
-            </tr>
-            <tr>
-                <td>Convolution Theorem</td>
-                <td>\( \mathcal{F}\{f(t) * g(t)\} = F(\omega) \cdot G(\omega) \)</td>
-            </tr>
-        </table>
-        <p><i>Key Properties of the Fourier Transform</i></p>
+        <div style="text-align:center; margin: 30px 0;">
+            <table style="border-collapse:collapse; margin-left:auto; margin-right:auto; display:inline-table;">
+                <tr>
+                    <th>Property</th>
+                    <th>Description</th>
+                </tr>
+                <tr>
+                    <td>Linearity</td>
+                    <td>\( \mathcal{F}\{af(t) + bg(t)\} = aF(\omega) + bG(\omega) \)</td>
+                </tr>
+                <tr>
+                    <td>Time Shifting</td>
+                    <td>\( \mathcal{F}\{f(t-t_0)\} = F(\omega)e^{-i\omega t_0} \)</td>
+                </tr>
+                <tr>
+                    <td>Frequency Shifting</td>
+                    <td>\( \mathcal{F}\{f(t)e^{i\omega_0 t}\} = F(\omega - \omega_0) \)</td>
+                </tr>
+                <tr>
+                    <td>Convolution Theorem</td>
+                    <td>\( \mathcal{F}\{f(t) * g(t)\} = F(\omega) \cdot G(\omega) \)</td>
+                </tr>
+            </table>
+            <p><i>Key Properties of the Fourier Transform</i></p>
+        </div>
+
+        <h4>Orthonormality of the Continuous Fourier Basis</h4>
+        <p>
+            The set of functions \( \left\{ \frac{e^{i\omega t}}{\sqrt{2\pi}} \right\} \) forms an orthonormal basis
+            for square-integrable functions on \( \mathbb{R} \). To check orthonormality, we compute the inner product
+            (which for
+            complex functions involves the complex conjugate):
+        </p>
+        \[
+        \int_{-\infty}^{\infty} \frac{e^{i\omega t}}{\sqrt{2\pi}} \cdot \overline{\frac{e^{i\omega' t}}{\sqrt{2\pi}}} dt
+        = \frac{1}{2\pi} \int_{-\infty}^{\infty} e^{i(\omega-\omega')t} dt = \delta(\omega-\omega')
+        \]
+        <p>
+            where the overline denotes complex conjugation. Orthonormality ensures that the Fourier coefficients are
+            independent and leads to Parseval's theorem (energy conservation).
+        </p>
+
+        <h4>Parseval's Theorem (Continuous Case)</h4>
+        <p>
+            Parseval's theorem states that the total energy of a signal is preserved under the Fourier Transform:
+        </p>
+        \[
+        \int_{-\infty}^{\infty} |f(t)|^2 dt = \int_{-\infty}^{\infty} |F(\omega)|^2 d\omega
+        \]
+        <p>
+            This means the energy (or power) of a signal in the time domain is exactly equal to the energy in the
+            frequency
+            domain. This property is a direct consequence of the orthonormality of the Fourier basis and is fundamental
+            in
+            signal processing, physics, and engineering, as it allows analysis and filtering to be performed
+            equivalently in
+            either domain.
+        </p>
+
+        <h3>Physical Interpretation</h3>
+        <p>
+            The Fourier Transform essentially asks: "How much of each frequency \( \omega \) is present in the signal \(
+            f(t) \)?"
+            The complex exponential \( e^{-i\omega t} = \cos(\omega t) - i\sin(\omega t) \) acts as a "probe" that
+            correlates
+            the signal with sinusoidal components at frequency \( \omega \).
+        </p>
+        <ul>
+            <li><b>Magnitude</b> \( |F(\omega)| \): represents the amplitude of frequency component \( \omega \)</li>
+            <li><b>Phase</b> \( \arg(F(\omega)) \): represents the phase shift of that frequency component</li>
+        </ul>
+        <p>Direct computation requires \( O(N^2) \) complex multiplications.</p>
+
+        <h3>Symmetry for Real-Valued Functions</h3>
+        <p>
+            If \( f(t) \) is real-valued, its Fourier Transform \( F(\omega) \) satisfies the Hermitian symmetry
+            property:
+        </p>
+        \[
+        F(-\omega) = F^*(\omega)
+        \]
+        <p>
+            where \( F^* \) denotes the complex conjugate. This means the negative frequency components are redundant
+            and determined by the positive frequencies. As a result, the full frequency content of a real signal is
+            captured
+            by the spectrum for \( \omega \geq 0 \), and the real and imaginary parts of \( F(\omega) \) correspond to
+            the amplitudes
+            of cosine and sine components, respectively.
+        </p>
+        <p>
+            This symmetry is fundamental for interpreting the spectrum of real signals and is analogous to the discrete
+            case. In particular, the real part of \( F(\omega) \) for \( \omega > 0 \) is doubled in the reconstruction
+            of \( f(t) \),
+            since the contributions from \( +\omega \) and \( -\omega \) add together. Thus, the amplitude at each
+            positive frequency
+            is often interpreted as \( 2\operatorname{Re}[F(\omega)] \) (or \( 2|F(\omega)| \) for the magnitude
+            spectrum), reflecting the combined
+            effect of both positive and negative frequencies.
+        </p>
     </div>
 
-    <h4>Orthonormality of the Continuous Fourier Basis</h4>
-    <p>
-        The set of functions \( \left\{ \frac{e^{i\omega t}}{\sqrt{2\pi}} \right\} \) forms an orthonormal basis
-        for square-integrable functions on \( \mathbb{R} \). To check orthonormality, we compute the inner product (which for
-        complex functions involves the complex conjugate):
-    </p>
-    \[
-    \int_{-\infty}^{\infty} \frac{e^{i\omega t}}{\sqrt{2\pi}} \cdot \overline{\frac{e^{i\omega' t}}{\sqrt{2\pi}}} dt
-    = \frac{1}{2\pi} \int_{-\infty}^{\infty} e^{i(\omega-\omega')t} dt = \delta(\omega-\omega')
-    \]
-    <p>
-        where the overline denotes complex conjugation. Orthonormality ensures that the Fourier coefficients are
-        independent and leads to Parseval's theorem (energy conservation).
-    </p>
-
-    <h4>Parseval's Theorem (Continuous Case)</h4>
-    <p>
-        Parseval's theorem states that the total energy of a signal is preserved under the Fourier Transform:
-    </p>
-    \[
-    \int_{-\infty}^{\infty} |f(t)|^2 dt = \int_{-\infty}^{\infty} |F(\omega)|^2 d\omega
-    \]
-    <p>
-        This means the energy (or power) of a signal in the time domain is exactly equal to the energy in the frequency
-        domain. This property is a direct consequence of the orthonormality of the Fourier basis and is fundamental in
-        signal processing, physics, and engineering, as it allows analysis and filtering to be performed equivalently in
-        either domain.
-    </p>
-
-    <h3>Physical Interpretation</h3>
-    <p>
-        The Fourier Transform essentially asks: "How much of each frequency \( \omega \) is present in the signal \( f(t) \)?"
-        The complex exponential \( e^{-i\omega t} = \cos(\omega t) - i\sin(\omega t) \) acts as a "probe" that correlates
-        the signal with sinusoidal components at frequency \( \omega \).
-    </p>
-    <ul>
-        <li><b>Magnitude</b> \( |F(\omega)| \): represents the amplitude of frequency component \( \omega \)</li>
-        <li><b>Phase</b> \( \arg(F(\omega)) \): represents the phase shift of that frequency component</li>
-    </ul>
-    <p>Direct computation requires \( O(N^2) \) complex multiplications.</p>
-
-    <h3>Symmetry for Real-Valued Functions</h3>
-    <p>
-        If \( f(t) \) is real-valued, its Fourier Transform \( F(\omega) \) satisfies the Hermitian symmetry property:
-    </p>
-    \[
-    F(-\omega) = F^*(\omega)
-    \]
-    <p>
-        where \( F^* \) denotes the complex conjugate. This means the negative frequency components are redundant
-        and determined by the positive frequencies. As a result, the full frequency content of a real signal is captured
-        by the spectrum for \( \omega \geq 0 \), and the real and imaginary parts of \( F(\omega) \) correspond to the amplitudes
-        of cosine and sine components, respectively.
-    </p>
-    <p>
-        This symmetry is fundamental for interpreting the spectrum of real signals and is analogous to the discrete
-        case. In particular, the real part of \( F(\omega) \) for \( \omega > 0 \) is doubled in the reconstruction of \( f(t) \),
-        since the contributions from \( +\omega \) and \( -\omega \) add together. Thus, the amplitude at each positive frequency
-        is often interpreted as \( 2\operatorname{Re}[F(\omega)] \) (or \( 2|F(\omega)| \) for the magnitude spectrum), reflecting the combined
-        effect of both positive and negative frequencies.
-    </p>
-
     <h2>The Discrete Fourier Transform (DFT)</h2>
-    <p>
-        In practice, we work with discrete, finite-length signals. The Discrete Fourier Transform (DFT) is the discrete
-        analog of the continuous Fourier Transform, designed for sequences of \( N \) samples.
-    </p>
-    <p>
-        For a discrete signal \( x[n] \) where \( n = 0, 1, 2, ..., N-1 \), the DFT is defined as:
-    </p>
-    \[
-    X[k] = \frac{1}{\sqrt{N}} \sum_{n=0}^{N-1} x[n] e^{-i 2\pi k n / N}
-    \]
-    <p>
-        where \( k = 0, 1, 2, ..., N-1 \) are the frequency bin indices.
-    </p>
-    <p>
-        The inverse DFT (IDFT) is:
-    </p>
-    \[
-    x[n] = \frac{1}{\sqrt{N}} \sum_{k=0}^{N-1} X[k] e^{i 2\pi k n / N}
-    \]
-    <p>
-        The power spectrum for discrete signals is computed as \( P[k] = |X[k]|^2 \), where \( X[k] \) is the DFT of \( x[n] \ ).
-        This quantity shows the energy content at each frequency bin \( k \) and is widely used to analyze the frequency
-        characteristics of digital signals.
-    </p>
 
-    <h4>Orthonormality of the Discrete Fourier Basis</h4>
-    <p>
-        The set of vectors \( \left\{ \frac{1}{\sqrt{N}} e^{i2\pi k n/N} \right\} \) for \( k=0,1,...,N-1 \) forms an orthonormal basis for
-        \( \mathbb{C}^N \) under the discrete inner product. The inner product for complex vectors also uses the complex
-        conjugate:
-    </p>
-    \[
-    \sum_{n=0}^{N-1} \frac{1}{\sqrt{N}} e^{i2\pi k n/N} \cdot \overline{\frac{1}{\sqrt{N}} e^{i2\pi k' n/N}}
-    = \frac{1}{N} \sum_{n=0}^{N-1} e^{i2\pi (k-k') n/N} = \delta_{k,k'}
-    \]
-    <p>
-        where the overline denotes complex conjugation, just as in the continuous case. This is the complex analog of
-        the dot product. This property guarantees the independence of frequency components and underpins Parseval's
-        theorem in the discrete case.
-    </p>
+    <div class="content-section">
+        <p>
+            In practice, we work with discrete, finite-length signals. The Discrete Fourier Transform (DFT) is the
+            discrete
+            analog of the continuous Fourier Transform, designed for sequences of \( N \) samples.
+        </p>
+        <p>
+            For a discrete signal \( x[n] \) where \( n = 0, 1, 2, ..., N-1 \), the DFT is defined as:
+        </p>
+        \[
+        X[k] = \frac{1}{\sqrt{N}} \sum_{n=0}^{N-1} x[n] e^{-i 2\pi k n / N}
+        \]
+        <p>
+            where \( k = 0, 1, 2, ..., N-1 \) are the frequency bin indices.
+        </p>
+        <p>
+            The inverse DFT (IDFT) is:
+        </p>
+        \[
+        x[n] = \frac{1}{\sqrt{N}} \sum_{k=0}^{N-1} X[k] e^{i 2\pi k n / N}
+        \]
+        <p>
+            The power spectrum for discrete signals is computed as \( P[k] = |X[k]|^2 \), where \( X[k] \) is the DFT of
+            \( x[n] \).
+            This quantity shows the energy content at each frequency bin \( k \) and is widely used to analyze the
+            frequency
+            characteristics of digital signals.
+        </p>
 
-    <h4>Parseval's Theorem (Discrete Case)</h4>
-    <p>
-        In the discrete case, Parseval's theorem states:
-    </p>
-    \[
-    \sum_{n=0}^{N-1} |x[n]|^2 = \sum_{k=0}^{N-1} |X[k]|^2
-    \]
-    <p>
-        That is, the sum of the squared magnitudes of the signal samples equals the sum of the squared magnitudes of its
-        DFT coefficients. This is crucial for digital signal processing, as it guarantees that no energy is lost or
-        gained when transforming between time and frequency domains, and enables energy-based analysis and filtering in
-        either domain.
-    </p>
+        <h3>Interactive Example: Signal Analysis</h3>
+        <p>
+            The visualization below demonstrates how different signal types (step, sine, square, triangle) appear in
+            both time and frequency domains.
+            The <b>top plot</b> shows the signal in the time domain, while the <b>bottom plot</b> shows its power
+            spectrum \( P[k] = |X[k]|^2 \).
+            Notice how each signal type has a characteristic frequency signature:
+        </p>
+        <ul>
+            <li><b>Sine wave:</b> Shows a single peak at its fundamental frequency</li>
+            <li><b>Square wave:</b> Contains odd harmonics (3f, 5f, 7f, ...) with decreasing amplitude</li>
+            <li><b>Triangle wave:</b> Similar to square wave but with faster harmonic decay</li>
+            <li><b>Step function:</b> Contains all frequencies, demonstrating the broad spectrum needed to create a
+                discontinuity</li>
+        </ul>
+    </div>
 
-    <h3>Frequency Interpretation</h3>
-    <p>
-        The DFT computes the spectrum at \( N \) equally spaced frequency points:
-    </p>
-    \[
-    \omega_k = \frac{2\pi k}{N}, \quad k = 0, 1, ..., N-1
-    \]
-    <p>
-        Even though \( k \) only ranges from 0 to \( N-1 \), these frequency indices actually wrap around the unit circle in the
-        complex plane. This means the DFT is periodic in frequency with period \( N \), and the upper half of the frequency
-        bins (for \( k > N/2 \)) can be interpreted as negative frequencies. Specifically, the frequency bin \( k \) corresponds
-        to a frequency of \( \omega_k = 2\pi k/N \), but for \( k > N/2 \), this is equivalent to \( \omega_k - 2\pi = 2\pi (k-N)/N \), which is a negative frequency. As a result, the DFT spectrum is often visualized by shifting the zero-frequency component to the center (using, for example, the <code>fftshift</code> operation in
-        software), so that negative frequencies appear on the left and positive frequencies on the right. This makes the
-        symmetry and interpretation of the spectrum more apparent, especially for real-valued signals.
-    </p>
-    <p>
-        If the sampling rate is \( f_s \), then the actual frequencies are:
-    </p>
-    \[
-    f_k = \frac{k f_s}{N}, \quad k = 0, 1, ..., N-1
-    \]
+    <div class="content-section container">
+        <canvas id="example-canvas" width="800" height="400"></canvas>
+        <div>
+            <b>Signal Type:</b>
+            <button class="example-btn" data-example="step">Step</button>
+            <button class="example-btn" data-example="sine">Sine</button>
+            <button class="example-btn" data-example="square">Square</button>
+            <button class="example-btn" data-example="triangle">Triangle</button>
+            <b>Frequency range:</b>
+            <label>From <input type="number" id="example-freq-min" value="0" min="0" max="100"
+                    style="width:4em"></label>
+            <label>to <input type="number" id="example-freq-max" value="8" min="1" max="100" style="width:4em"></label>
+        </div>
+        <div style="margin-top:1em">
+            <canvas id="spectrum-canvas" width="800" height="200"></canvas>
+        </div>
 
-    <h3>Symmetry for Real Signals</h3>
-    <p>
-        When the input signal \( x[n] \) is real-valued, the DFT exhibits a special symmetry known as Hermitian symmetry:
-    </p>
-    \[
-    X[k] = X^*[N - k]
-    \]
-    <p>
-        where \( X^* \) denotes the complex conjugate and \( N \) is the total number of points. This means the spectrum
-        is redundant for negative frequencies, and the information for \( k \) and \( N-k \) is related.
-    </p>
-    <p>
-        As a result, the DFT of a real signal can be fully described by the coefficients for \( k = 0 \) to \( N/2 \) (for even \( N \)).
-        The real part of \( X[k] \) gives the amplitude of the cosine component at frequency \( k \), and the imaginary part gives
-        the amplitude of the sine component. The magnitude spectrum is often plotted as \( 2|X[k]| \) for \( k > 0 \) to account
-        for the energy shared between positive and negative frequencies.
-    </p>
-    <p>
-        This symmetry is important for interpreting the frequency content of real-world signals (such as audio, images,
-        and measurements), and is exploited in many FFT implementations to save computation and storage.
-    </p>
-
-    <div class="container">
-        <div class="canvas-section">
-            <h2>Function Analysis</h2>
-            <canvas id="example-canvas" width="800" height="400"></canvas>
-            <div>
-                <b>Example:</b>
-                <button class="example-btn" data-example="step">Step</button>
-                <button class="example-btn" data-example="sine">Sine</button>
-                <button class="example-btn" data-example="square">Square</button>
-                <button class="example-btn" data-example="triangle">Triangle</button>
-                <b>Frequency range:</b>
-                <label>From <input type="number" id="example-freq-min" value="0" min="0" max="100"
-                        style="width:4em"></label>
-                <label>to <input type="number" id="example-freq-max" value="8" min="1" max="100"
-                        style="width:4em"></label>
-            </div>
-            <div style="margin-top:2em">
-                <canvas id="spectrum-canvas" width="800" height="200"></canvas>
-                <b>Power Spectrum</b>
-            </div>
+        <div class="canvas-controls-info">
+            <strong>📱 Interactive Controls:</strong>
+            <span>Click to focus • Mouse wheel to zoom • Drag to pan • Right-click to reset</span>
+            <span>• Hold Ctrl+wheel for horizontal zoom • Hold Shift+wheel for vertical zoom</span>
         </div>
     </div>
 
-    <h3>Key Differences from CFT</h3>
-    <ul>
-        <li><b>Periodicity:</b> Both \( x[n] \) and \( X[k] \) are periodic with period \( N \)</li>
-        <li><b>Finite:</b> We only consider \( N \) samples in both domains</li>
-        <li><b>Sampling:</b> The frequency domain is also sampled (quantized)</li>
-    </ul>
+    <div class="content-section">
+        <h4>Orthonormality of the Discrete Fourier Basis</h4>
+        <p>
+            The set of vectors \( \left\{ \frac{1}{\sqrt{N}} e^{i2\pi k n/N} \right\} \) for \( k=0,1,...,N-1 \) forms
+            an orthonormal basis for
+            \( \mathbb{C}^N \) under the discrete inner product. The inner product for complex vectors also uses the
+            complex
+            conjugate:
+        </p>
+        \[
+        \sum_{n=0}^{N-1} \frac{1}{\sqrt{N}} e^{i2\pi k n/N} \cdot \overline{\frac{1}{\sqrt{N}} e^{i2\pi k' n/N}}
+        = \frac{1}{N} \sum_{n=0}^{N-1} e^{i2\pi (k-k') n/N} = \delta_{k,k'}
+        \]
+        <p>
+            where the overline denotes complex conjugation, just as in the continuous case. This is the complex analog
+            of
+            the dot product. This property guarantees the independence of frequency components and underpins Parseval's
+            theorem in the discrete case.
+        </p>
 
-    <h3>Windowing</h3>
-    <p>
-        When applying the DFT to finite-length signals, edge effects can cause spectral leakage. Windowing functions
-        (Hamming, Hanning, Blackman) are applied to mitigate these effects:
-    </p>
-    \[
-    x_w[n] = x[n] \cdot w[n]
-    \]
-    <p>
-        where \( w[n] \) is the window function.
-    </p>
+        <h4>Parseval's Theorem (Discrete Case)</h4>
+        <p>
+            In the discrete case, Parseval's theorem states:
+        </p>
+        \[
+        \sum_{n=0}^{N-1} |x[n]|^2 = \sum_{k=0}^{N-1} |X[k]|^2
+        \]
+        <p>
+            That is, the sum of the squared magnitudes of the signal samples equals the sum of the squared magnitudes of
+            its
+            DFT coefficients. This is crucial for digital signal processing, as it guarantees that no energy is lost or
+            gained when transforming between time and frequency domains, and enables energy-based analysis and filtering
+            in
+            either domain.
+        </p>
 
-    <h3>Zero-Padding</h3>
-    <p>
-        Zero-padding increases frequency resolution and can improve the appearance of the spectrum:
-    </p>
-    \[
-    x_{\text{padded}}[n] = \begin{cases}
-    x[n] & \text{if } 0 \leq n < N \\
-    0 & \text{if } N \leq n < M
-    \end{cases}
-    \]
-    <p>
-        where \( M > N \) is the new length.
-    </p>
+        <h3>Frequency Interpretation</h3>
+        <p>
+            The DFT computes the spectrum at \( N \) equally spaced frequency points:
+        </p>
+        \[
+        \omega_k = \frac{2\pi k}{N}, \quad k = 0, 1, ..., N-1
+        \]
+        <p>
+            Even though \( k \) only ranges from 0 to \( N-1 \), these frequency indices actually wrap around the unit
+            circle in the
+            complex plane. This means the DFT is periodic in frequency with period \( N \), and the upper half of the
+            frequency
+            bins (for \( k > N/2 \)) can be interpreted as negative frequencies. Specifically, the frequency bin \( k \)
+            corresponds
+            to a frequency of \( \omega_k = 2\pi k/N \), but for \( k > N/2 \), this is equivalent to \( \omega_k - 2\pi
+            = 2\pi (k-N)/N \), which is a negative frequency. As a result, the DFT spectrum is often visualized by
+            shifting the zero-frequency component to the center (using, for example, the fftshift operation in
+            software), so that negative frequencies appear on the left and positive frequencies on the right. This makes
+            the
+            symmetry and interpretation of the spectrum more apparent, especially for real-valued signals.
+        </p>
+        <p>
+            If the sampling rate is \( f_s \), then the actual frequencies are:
+        </p>
+        \[
+        f_k = \frac{k f_s}{N}, \quad k = 0, 1, ..., N-1
+        \]
+
+        <h3>Symmetry for Real Signals</h3>
+        <p>
+            When the input signal \( x[n] \) is real-valued, the DFT exhibits a special symmetry known as Hermitian
+            symmetry:
+        </p>
+        \[
+        X[k] = X^*[N - k]
+        \]
+        <p>
+            where \( X^* \) denotes the complex conjugate and \( N \) is the total number of points. This means the
+            spectrum
+            is redundant for negative frequencies, and the information for \( k \) and \( N-k \) is related.
+        </p>
+        <p>
+            As a result, the DFT of a real signal can be fully described by the coefficients for \( k = 0 \) to \( N/2
+            \) (for even \( N \)).
+            The real part of \( X[k] \) gives the amplitude of the cosine component at frequency \( k \), and the
+            imaginary part gives
+            the amplitude of the sine component. The magnitude spectrum is often plotted as \( 2|X[k]| \) for \( k > 0
+            \) to account
+            for the energy shared between positive and negative frequencies.
+        </p>
+        <p>
+            This symmetry is important for interpreting the frequency content of real-world signals (such as audio,
+            images,
+            and measurements), and is exploited in many FFT implementations to save computation and storage.
+        </p>
+
+        <h3>Key Differences from CFT</h3>
+        <ul>
+            <li><b>Periodicity:</b> Both \( x[n] \) and \( X[k] \) are periodic with period \( N \)</li>
+            <li><b>Finite:</b> We only consider \( N \) samples in both domains</li>
+            <li><b>Sampling:</b> The frequency domain is also sampled (quantized)</li>
+        </ul>
+
+        <h3>Windowing</h3>
+        <p>
+            When applying the DFT to finite-length signals, edge effects can cause spectral leakage. Windowing functions
+            (Hamming, Hanning, Blackman) are applied to mitigate these effects:
+        </p>
+        \[
+        x_w[n] = x[n] \cdot w[n]
+        \]
+        <p>
+            where \( w[n] \) is the window function.
+        </p>
+
+        <h3>Zero-Padding</h3>
+        <p>
+            Zero-padding increases frequency resolution and can improve the appearance of the spectrum:
+        </p>
+        \[
+        x_{\text{padded}}[n] = \begin{cases}
+        x[n] & \text{if } 0 \leq n < N \\ 0 & \text{if } N \leq n < M \end{cases} \] <p>
+            where \( M > N \) is the new length.
+            </p>
+    </div>
 
     <h2>Fourier Transform for Parametrized Curves</h2>
 
-    <p>
-        For a parametrized curve \( [x(t), y(t)] \), there are two common approaches to Fourier analysis:
-    </p>
+    <div class="content-section">
+        <p>
+            For a parametrized curve \( [x(t), y(t)] \), there are two common approaches to Fourier analysis:
+        </p>
 
-    <b>Component-wise:</b> Apply the Fourier Transform separately to \( x(t) \) and \( y(t) \).
-    \[
-    \begin{gathered}
-    X(\omega) = \int_{-\infty}^{\infty} x(t) e^{-i\omega t} dt \qquad
-    Y(\omega) = \int_{-\infty}^{\infty} y(t) e^{-i\omega t} dt
-    \end{gathered}
-    \]
+        <p><b>Component-wise:</b> Apply the Fourier Transform separately to \( x(t) \) and \( y(t) \).</p>
+        \[
+        \begin{gathered}
+        X(\omega) = \int_{-\infty}^{\infty} x(t) e^{-i\omega t} dt \qquad
+        Y(\omega) = \int_{-\infty}^{\infty} y(t) e^{-i\omega t} dt
+        \end{gathered}
+        \]
 
-    <b>Complex signal:</b> Combine the components into a single complex signal \( z(t) = x(t) + i y(t) \) and analyze \( z(t) \).
-    \[
-    Z(\omega) = \int_{-\infty}^{\infty} [x(t) + i y(t)] e^{-i\omega t} dt
-    \]
+        <p><b>Complex signal:</b> Combine the components into a single complex signal \( z(t) = x(t) + i y(t) \) and
+            analyze \( z(t) \).</p>
+        \[
+        Z(\omega) = \int_{-\infty}^{\infty} [x(t) + i y(t)] e^{-i\omega t} dt
+        \]
 
-    <p>
-        Both approaches are useful and reveal different aspects of the curve's frequency content. Treating \( x(t) \) and \( y(t) \) separately is simple and useful when the components are independent. The complex approach is powerful for capturing phase relationships and correlations, and is often used in shape and motion analysis. Comparing both the individual and complex spectra can provide deeper insight into the structure and dynamics of the curve. For either approach, the power spectrum is given by the squared magnitude of the transform:
-    </p>
-    <ul>
-        <li><b>Component-wise:</b> \( |X(\omega)|^2 \) and \( |Y(\omega)|^2 \) (can be summed for total power).</li>
-        <li><b>Complex signal:</b> \( |Z(\omega)|^2 \) (includes cross-terms and phase relationships).</li>
-    </ul>
+        <p>
+            Both approaches are useful and reveal different aspects of the curve's frequency content. Treating \( x(t)
+            \) and \( y(t) \) separately is simple and useful when the components are independent. The complex approach
+            is powerful for capturing phase relationships and correlations, and is often used in shape and motion
+            analysis. Comparing both the individual and complex spectra can provide deeper insight into the structure
+            and dynamics of the curve. For either approach, the power spectrum is given by the squared magnitude of the
+            transform:
+        </p>
+        <ul>
+            <li><b>Component-wise:</b> \( |X(\omega)|^2 \) and \( |Y(\omega)|^2 \) (can be summed for total power).</li>
+            <li><b>Complex signal:</b> \( |Z(\omega)|^2 \) (includes cross-terms and phase relationships).</li>
+        </ul>
 
-    <h3>Applications</h3>
-    <p>
-        Fourier analysis of parametrized curves is useful in:
-    </p>
-    <ul>
-        <li><b>Shape Analysis:</b> Decomposing shapes into frequency components for comparison or recognition.</li>
-        <li><b>Motion Analysis:</b> Analyzing trajectories in terms of their frequency content.</li>
-        <li><b>Signal Processing:</b> Studying periodic patterns in two-dimensional data.</li>
-    </ul>
+        <h3>Interactive Animation: Parametric Curves</h3>
+        <p>
+            The animation below shows how different parametric curves can be decomposed into their frequency components.
+            The <b>curve</b> is traced out in real-time, showing the relationship between the parameter \( t \) and the
+            resulting shape.
+            The <b>power spectrum</b> below reveals which frequencies are most prominent in the curve's motion.
+        </p>
+        <p>
+            Use the frequency range controls to focus on specific harmonic content. Notice how:
+        </p>
+        <ul>
+            <li><b>Epitrochoids</b> show clear frequency peaks related to the rolling circle ratios</li>
+            <li><b>Rose curves</b> have spectra dominated by their defining harmonic frequencies</li>
+            <li><b>Lissajous curves</b> reveal the independent oscillations in x and y directions</li>
+            <li><b>Spirograph patterns</b> display rich harmonic structure from multiple frequency components</li>
+        </ul>
+    </div>
 
-    <h3>Examples</h3>
-    <ul>
-        <li>
-            <b>Epitrochoid:</b> An epitrochoid is a type of roulette curve traced by a point attached to a circle of radius \( r \) rolling around the outside of a fixed circle of radius \( R \). The parameter \( d \) controls the distance from the center of the rolling circle to the tracing point. These curves can create intricate, spirograph-like patterns and are useful for demonstrating how complex periodic shapes can be decomposed into frequency components.
-            \[
-            \begin{align*}
+    <div class="content-section container">
+        <canvas id="animation-canvas" width="800" height="400"></canvas>
+        <div>
+            <b>Curve Type:</b>
+            <button class="animation-example-btn" data-example="0">Epitrochoid</button>
+            <button class="animation-example-btn" data-example="1">Rose Curve</button>
+            <button class="animation-example-btn" data-example="2">Lissajous</button>
+            <button class="animation-example-btn" data-example="3">Spirograph</button>
+        </div>
+        <div>
+            <b>Controls:</b>
+            <button id="backward" title="Backward">&#9664;&#9664;</button>
+            <button id="play-pause" title="Play/Pause">&#9654;&#9208;</button>
+            <button id="stop" title="Stop">&#9209;</button>
+            <button id="forward" title="Forward">&#9654;&#9654;</button>
+
+            <b>Frequency range:</b>
+            <label>From <input type="number" id="animation-freq-min" value="1" min="0" max="100"
+                    style="width:4em"></label>
+            <label>to <input type="number" id="animation-freq-max" value="8" min="1" max="100"
+                    style="width:4em"></label>
+        </div>
+        <div style="margin-top:1em">
+            <canvas id="animation-spectrum-canvas" width="800" height="200"></canvas>
+        </div>
+    </div>
+
+    <div class="content-section">
+        <h3>Mathematical Examples</h3>
+        <ul>
+            <li>
+                <b>Epitrochoid:</b> An epitrochoid is a type of roulette curve traced by a point attached to a circle of
+                radius \( r \) rolling around the outside of a fixed circle of radius \( R \). The parameter \( d \)
+                controls the distance from the center of the rolling circle to the tracing point. These curves can
+                create intricate, spirograph-like patterns and are useful for demonstrating how complex periodic shapes
+                can be decomposed into frequency components.
+                \[
+                \begin{align*}
                 x(t) &= (R + r) \cos t + d \cos\left(\frac{R + r}{r} t\right) \\
                 y(t) &= (R + r) \sin t + d \sin\left(\frac{R + r}{r} t\right)
-            \end{align*}
-            \]
-            (e.g., \( R=5 \), \( r=1 \), \( d=2 \))
-        </li>
-        <li>
-            <b>Rose curve:</b> The rose curve is a polar curve with petal-like shapes, defined by a sum of cosines with different frequencies. The number and shape of the petals depend on the coefficients and frequencies used. Rose curves are classic examples in Fourier analysis because their symmetry and periodicity make their frequency content easy to interpret.
-            \[
-            \begin{align*}
+                \end{align*}
+                \]
+                (e.g., \( R=5 \), \( r=1 \), \( d=2 \))
+            </li>
+            <li>
+                <b>Rose curve:</b> The rose curve is a polar curve with petal-like shapes, defined by a sum of cosines
+                with different frequencies. The number and shape of the petals depend on the coefficients and
+                frequencies used. Rose curves are classic examples in Fourier analysis because their symmetry and
+                periodicity make their frequency content easy to interpret.
+                \[
+                \begin{align*}
                 r(t) &= 3\cos(3t) + \cos(9t) + 0.5\cos(15t) \\
                 x(t) &= r(t)\cos t \\
                 y(t) &= r(t)\sin t
-            \end{align*}
-            \]
-        </li>
-        <li>
-            <b>Lissajous curve:</b> Lissajous curves are generated by combining two sinusoidal oscillations in perpendicular directions, often with different frequencies and a phase shift. They are used to illustrate the relationship between frequency, phase, and shape, and are common in signal analysis and physics demonstrations.
-            \[
-            \begin{align*}
+                \end{align*}
+                \]
+            </li>
+            <li>
+                <b>Lissajous curve:</b> Lissajous curves are generated by combining two sinusoidal oscillations in
+                perpendicular directions, often with different frequencies and a phase shift. They are used to
+                illustrate the relationship between frequency, phase, and shape, and are common in signal analysis and
+                physics demonstrations.
+                \[
+                \begin{align*}
                 x(t) &= 4\sin(3t) + 1.5\sin(6t) + 0.8\sin(9t) \\
                 y(t) &= 3\sin(5t + \phi) + 1.2\sin(10t) + 0.6\sin(15t)
-            \end{align*}
-            \]
-            (with \( \phi = \pi/4 \))
-        </li>
-        <li>
-            <b>Spirograph-like:</b> This example combines several sine and cosine terms with different amplitudes and frequencies to create a complex, closed curve reminiscent of patterns made by a spirograph toy. Such curves demonstrate how adding harmonics (higher-frequency components) affects the overall shape, and how Fourier series can represent intricate periodic patterns.
-            \[
-            \begin{align*}
+                \end{align*}
+                \]
+                (with \( \phi = \pi/4 \))
+            </li>
+            <li>
+                <b>Spirograph-like:</b> This example combines several sine and cosine terms with different amplitudes
+                and frequencies to create a complex, closed curve reminiscent of patterns made by a spirograph toy. Such
+                curves demonstrate how adding harmonics (higher-frequency components) affects the overall shape, and how
+                Fourier series can represent intricate periodic patterns.
+                \[
+                \begin{align*}
                 x(t) &= 3\cos t + 2\cos(2t) + 1\cos(4t) + 0.5\cos(7t) \\
                 y(t) &= 3\sin t + 2\sin(2t) + 1\sin(4t) + 0.5\sin(7t)
-            \end{align*}
-            \]
-        </li>
-    </ul>
-
-    <div class="container">
-        <div class="canvas-section">
-            <h2>Fourier Animation</h2>
-            <canvas id="animation-canvas" width="800" height="400"></canvas>
-            <div>
-                <b>Example:</b>
-                <button class="animation-example-btn" data-example="0">Epitrochoid</button>
-                <button class="animation-example-btn" data-example="1">Rose Curve</button>
-                <button class="animation-example-btn" data-example="2">Lissajous</button>
-                <button class="animation-example-btn" data-example="3">Spirograph</button>
-            </div>
-            <div>
-                <button id="backward" title="Backward">&#9664;&#9664;</button>
-                <button id="play-pause" title="Play/Pause">&#9654;&#9208;</button>
-                <button id="stop" title="Stop">&#9209;</button>
-                <button id="forward" title="Forward">&#9654;&#9654;</button>
-
-                <b>Frequency range:</b>
-                <label>From <input type="number" id="animation-freq-min" value="1" min="0" max="100"
-                        style="width:4em"></label>
-                <label>to <input type="number" id="animation-freq-max" value="8" min="1" max="100"
-                        style="width:4em"></label>
-            </div>
-            <div style="margin-top:2em">
-                <canvas id="animation-spectrum-canvas" width="800" height="200"></canvas>
-                <b>Animation Power Spectrum</b>
-            </div>
-        </div>
+                \end{align*}
+                \]
+            </li>
+        </ul>
     </div>
 </body>
 
